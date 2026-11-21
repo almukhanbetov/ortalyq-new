@@ -10,10 +10,12 @@ import (
 )
 
 type Config struct {
-	Env              string // "local" or "production"
-	HTTPAddr         string
-	DatabaseURL      string
-	AllowedOrigins   []string
+	Env            string // "local" or "production"
+	HTTPAddr       string
+	DatabaseURL    string
+	AllowedOrigins []string
+	// TrustedProxies: CIDRs/IPs whose X-Forwarded-For is believed (the reverse proxy). Empty keeps Gin's default.
+	TrustedProxies   []string
 	CookieName       string
 	CookieSecure     bool
 	CookieDomain     string
@@ -43,6 +45,7 @@ func Load() (Config, error) {
 		HTTPAddr:         get("HTTP_ADDR", ":8448"),
 		DatabaseURL:      os.Getenv("DATABASE_URL"),
 		AllowedOrigins:   splitList(get("CORS_ORIGINS", "http://localhost:3448")),
+		TrustedProxies:   splitList(os.Getenv("TRUSTED_PROXIES")),
 		CookieName:       get("SESSION_COOKIE_NAME", "ortalyq_session"),
 		CookieSecure:     getBool("COOKIE_SECURE", true),
 		CookieDomain:     os.Getenv("COOKIE_DOMAIN"),

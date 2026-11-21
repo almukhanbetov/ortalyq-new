@@ -1,0 +1,177 @@
+# Checks → images in GHCR tagged with the commit SHA → deploy to the VPS over SSH.
+# Pull requests run only the checks. Pushes to main (and manual runs on main) also build and deploy.
+name: CI and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # ghcr.io/almukhanbetov/ortalyq-new/{api,web}:<sha>
+  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+  # Baked into the web image (browser → API). Must equal SITE_URL in /opt/bilimway/.env.
+  SITE_URL: ${{ vars.SITE_URL || 'https://bilimway.kz' }}
+  DEPLOY_DIR: /opt/bilimway
+
+jobs:
+  backend:
+    name: Backend (vet, tests)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ortalyq_new_test
+          POSTGRES_USER: ortalyq_new
+          POSTGRES_PASSWORD: ci-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ortalyq_new -d ortalyq_new_test"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - run: go vet ./...
+      - name: go test (with integration tests against PostgreSQL)
+        run: go test ./...
+        env:
+          TEST_DATABASE_URL: postgres://ortalyq_new:ci-only@localhost:5432/ortalyq_new_test?sslmode=disable
+
+  frontend:
+    name: Frontend (types, lint, locales, build)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Locale keys match (ru, kk, en)
+        run: node scripts/locales-check.mjs
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ env.SITE_URL }}
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  images:
+    name: Image ${{ matrix.name }}
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [backend, frontend]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: api
+            context: backend
+          - name: web
+            context: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}:${{ github.sha }}
+          build-args: |
+            VERSION=${{ github.sha }}
+            NEXT_PUBLIC_API_URL=${{ env.SITE_URL }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
+
+  deploy:
+    name: Deploy to VPS
+    needs: images
+    runs-on: ubuntu-24.04
+    environment:
+      name: production
+      url: ${{ env.SITE_URL }}
+    permissions:
+      contents: read
+      packages: read
+    # One deploy at a time; a queued one waits instead of cancelling a deploy in progress.
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    env:
+      SSH_HOST: ${{ secrets.VPS_HOST }}
+      SSH_PORT: ${{ secrets.VPS_PORT }}
+      SSH_USER: ${{ secrets.VPS_USER }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: SSH key and pinned host key
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_KEY" ] || [ -z "$KNOWN_HOSTS" ]; then
+            echo "::error::VPS_HOST, VPS_USER, VPS_SSH_KEY and VPS_KNOWN_HOSTS secrets are required"; exit 1
+          fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<CFG
+          Host vps
+            HostName $SSH_HOST
+            Port ${SSH_PORT:-22}
+            User $SSH_USER
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+          CFG
+      - name: Upload compose, Caddyfile and scripts (the server .env is not touched)
+        run: |
+          # shellcheck disable=SC2029 # DEPLOY_DIR is expanded here on purpose
+          tar -C deploy -cz --transform 's|^compose.prod.yml$|compose.yml|' \
+              compose.prod.yml Caddyfile .env.production.example scripts \
+            | ssh vps "install -d -m 755 '$DEPLOY_DIR' && tar -xz -C '$DEPLOY_DIR' --no-same-owner && chmod +x '$DEPLOY_DIR'/scripts/*.sh '$DEPLOY_DIR'/scripts/dc"
+      - name: Deploy ${{ github.sha }}
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # shellcheck disable=SC2029 # the actor, dir and sha are expanded here on purpose
+          # The job token (read:packages, valid only while this job runs) lets the server pull from GHCR.
+          printf '%s' "$GHCR_TOKEN" | ssh vps "docker login ghcr.io -u '${{ github.actor }}' --password-stdin" > /dev/null
+          # shellcheck disable=SC2029
+          ssh vps "'$DEPLOY_DIR/scripts/deploy.sh' '${{ github.sha }}'"
+      - name: Log out of GHCR on the server
+        if: always()
+        run: ssh vps "docker logout ghcr.io" > /dev/null 2>&1 || true
+      - name: External check over public DNS
+        run: |
+          for _ in $(seq 1 12); do
+            curl -fsS --max-time 10 "$SITE_URL/healthz" && exit 0
+            sleep 5
+          done
+          echo "::error::$SITE_URL/healthz is not reachable from the internet"; exit 1

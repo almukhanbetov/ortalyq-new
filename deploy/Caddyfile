@@ -1,0 +1,48 @@
+# Caddy: HTTPS (Let's Encrypt, automatic), www → apex, /api and WebSocket → Go API, the rest → Next.js.
+# Domains come from the environment (SITE_DOMAIN, WWW_DOMAIN in /opt/bilimway/.env).
+{
+	email {$ACME_EMAIL}
+	servers {
+		# HTTP/3 needs UDP 443 open; TCP 443 is enough for everything else.
+		protocols h1 h2 h3
+	}
+}
+
+# One origin only: the session cookie is host-only (__Host-), CORS_ORIGINS lists just the apex.
+{$WWW_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	# REST, uploads and WebSocket (/api/classrooms/:id/ws). reverse_proxy passes the Upgrade through
+	# and sets X-Forwarded-For to the real client IP (incoming X-Forwarded-* from clients are dropped).
+	@api path /api/* /healthz
+	handle @api {
+		# Uploads: UPLOAD_MAX_MB (10) plus multipart overhead. The API enforces the exact limit itself.
+		request_body {
+			max_size 16MB
+		}
+		reverse_proxy api:8448 {
+			# Keep WebSocket connections open across Caddy config reloads for a while.
+			stream_close_delay 5m
+		}
+	}
+
+	handle {
+		reverse_proxy web:3448
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

@@ -2,6 +2,7 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -66,6 +67,12 @@ func New(cfg config.Config, pool *pgxpool.Pool) (*App, error) {
 	chatSvc := chat.NewService(chat.NewRepository(pool), classSvc, upSvc, chat.NewGiphy(cfg.GiphyAPIKey, cfg.GiphyAPIBase), hub)
 
 	r := gin.New()
+	// Behind a reverse proxy the client IP (login rate limits) comes from X-Forwarded-For of trusted proxies only.
+	if len(cfg.TrustedProxies) > 0 {
+		if err := r.SetTrustedProxies(cfg.TrustedProxies); err != nil {
+			return nil, fmt.Errorf("TRUSTED_PROXIES: %w", err)
+		}
+	}
 	r.Use(middleware.Recovery(), middleware.Logger(), middleware.SecurityHeaders(),
 		middleware.CORS(cfg.AllowedOrigins), middleware.OriginGuard(cfg.AllowedOrigins))
 	r.MaxMultipartMemory = 8 << 20

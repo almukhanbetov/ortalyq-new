@@ -34,3 +34,22 @@ docs/reference/classes/*
 *.log
 *.dump
 *.sql.gz
+
+# Production server state (lives only on the VPS)
+deploy/.env
+
+# Any env file except the committed examples; SSH keys and host files never belong in the repo
+.env.*
+!.env.example
+!.env.production.example
+id_rsa*
+id_ed25519*
+id_ecdsa*
+*.pem
+*.key
+*known_hosts*
+bilimway_deploy*
+bilimway_admin*
+deploy/backups/
+deploy/current_tag
+deploy/releases.log

@@ -127,6 +127,9 @@ GIF ищутся и проверяются на сервере. Ключ в бр
 - Свой `DATABASE_URL`, `CORS_ORIGINS` — origin фронтенда.
 - `NEXT_PUBLIC_API_URL` передаётся при сборке frontend.
 - Переменные `SEED_*` не задавайте.
+- За обратным прокси — `TRUSTED_PROXIES` (CIDR прокси), иначе IP для лимитов входа берётся из любого `X-Forwarded-For`.
+
+Деплой на bilimway.kz (Docker Compose, Caddy, GHCR, GitHub Actions), бэкапы и откат: [docs/deploy.md](docs/deploy.md).
 
 ## Известные ограничения
 
