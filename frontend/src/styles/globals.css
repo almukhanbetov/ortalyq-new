@@ -1,0 +1,56 @@
+@import './tokens.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-page text-ink font-sans text-base antialiased; }
+  :focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(26, 198, 255, 0.45); border-radius: 6px; }
+  button { -webkit-tap-highlight-color: transparent; }
+}
+
+@layer utilities {
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: rgb(var(--line-strong)) transparent; }
+  .sr-only-focusable:not(:focus) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+}
+
+/* Ready class backgrounds of marathons (stage 10). Built only from the design tokens: soft gradients and shapes,
+   light enough for text and exercise cards on top. The class name is `class-bg-<preset>`. */
+@layer components {
+  .class-bg-plain { background-color: rgb(var(--surface)); }
+  .class-bg-sunrise {
+    background-color: rgb(var(--warning-soft));
+    background-image:
+      radial-gradient(120% 90% at 100% 0%, rgb(var(--pink-soft)) 0%, transparent 60%),
+      linear-gradient(160deg, rgb(var(--warning-soft)) 0%, rgb(var(--pink-soft)) 55%, rgb(var(--primary-soft)) 100%);
+  }
+  .class-bg-waves {
+    background-color: rgb(var(--info-soft));
+    background-image:
+      radial-gradient(140% 60% at 0% 100%, rgb(var(--primary) / 0.16) 0 40%, transparent 41%),
+      radial-gradient(120% 50% at 100% 100%, rgb(var(--primary) / 0.12) 0 45%, transparent 46%),
+      radial-gradient(160% 40% at 50% 0%, rgb(var(--surface)) 0 50%, transparent 51%);
+  }
+  .class-bg-petals {
+    background-color: rgb(var(--pink-soft));
+    background-image:
+      radial-gradient(ellipse 18px 9px at 25% 30%, rgb(var(--pink) / 0.18) 98%, transparent 100%),
+      radial-gradient(ellipse 9px 18px at 75% 70%, rgb(var(--pink) / 0.14) 98%, transparent 100%);
+    background-size: 96px 96px;
+  }
+  .class-bg-leaves {
+    background-color: rgb(var(--success-soft));
+    background-image:
+      radial-gradient(ellipse 22px 8px at 30% 25%, rgb(var(--success) / 0.2) 98%, transparent 100%),
+      radial-gradient(ellipse 8px 22px at 70% 72%, rgb(var(--success) / 0.16) 98%, transparent 100%);
+    background-size: 110px 110px;
+  }
+  .class-bg-autumn {
+    background-color: rgb(var(--warning-soft));
+    background-image:
+      radial-gradient(circle 10px at 25% 30%, rgb(var(--warning) / 0.28) 98%, transparent 100%),
+      radial-gradient(ellipse 16px 8px at 72% 68%, rgb(var(--danger) / 0.12) 98%, transparent 100%);
+    background-size: 100px 100px;
+  }
+}

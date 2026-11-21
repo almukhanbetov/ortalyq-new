@@ -1,0 +1,48 @@
+name: ortalyq-new
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ortalyq_new
+      POSTGRES_USER: ortalyq_new
+      POSTGRES_PASSWORD: ortalyq_new_local
+    ports:
+      - "127.0.0.1:5448:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ortalyq_new -d ortalyq_new"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    env_file: ./backend/.env.example
+    environment:
+      DATABASE_URL: postgres://ortalyq_new:ortalyq_new_local@postgres:5432/ortalyq_new?sslmode=disable
+      UPLOAD_DIR: /data/uploads
+      AUTO_MIGRATE: "true"
+      GIPHY_API_KEY: ${GIPHY_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8448:8448"
+    volumes:
+      - uploads:/data/uploads
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8448
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:3448:3448"
+
+volumes:
+  pgdata:
+  uploads:

@@ -1,0 +1,42 @@
+/* ORTALYQ-NEW design tokens (RGB triplets for Tailwind alpha support).
+   Palette derived from the public Edvibe site (font Ubuntu, accent #1AC6FF, ink #18181B/#525266/#797986). */
+:root {
+  --primary: 26 198 255;        /* #1AC6FF */
+  --primary-hover: 0 178 238;   /* #00B2EE */
+  --primary-active: 0 156 212;  /* #009CD4 */
+  --primary-soft: 232 248 255;  /* #E8F8FF */
+  --primary-text: 0 134 184;    /* #0086B8 – AA on white */
+
+  --ink: 24 24 27;              /* #18181B */
+  --ink-body: 82 82 102;        /* #525266 */
+  --ink-muted: 121 121 134;     /* #797986 */
+  --ink-faint: 184 184 204;     /* #B8B8CC */
+  --ink-soft: 141 141 165;      /* #8D8DA5 – secondary labels on the classes page */
+
+  --page: 247 249 252;          /* #F7F9FC */
+  --surface: 255 255 255;
+  --surface-alt: 247 248 251;   /* #F7F8FB */
+  --surface-hover: 240 242 247; /* #F0F2F7 */
+  --line: 230 232 240;          /* #E6E8F0 */
+  --line-strong: 214 217 228;   /* #D6D9E4 */
+  --line-soft: 233 233 242;     /* #E9E9F2 – inputs, tiles, chips */
+  --shell-line: 237 239 246;    /* #EDEFF6 – cabinet header/sidebar edges */
+  --fill: 245 245 250;          /* #F5F5FA – segmented controls, chip outlines */
+  --tooltip: 82 82 102;         /* #525266 */
+
+  --success: 22 199 132;        /* #16C784 */
+  --success-soft: 231 249 239;  /* #E7F9EF */
+  --success-text: 11 128 82;    /* #0B8052 */
+  --danger: 255 77 79;          /* #FF4D4F */
+  --danger-soft: 255 236 236;   /* #FFECEC */
+  --danger-text: 200 36 40;     /* #C82428 */
+  --warning: 255 176 32;        /* #FFB020 */
+  --warning-soft: 255 246 224;  /* #FFF6E0 */
+  --warning-text: 150 96 0;     /* #966000 */
+  --pink: 255 92 147;           /* #FF5C93 */
+  --pink-soft: 255 233 241;     /* #FFE9F1 */
+  --pink-text: 186 30 88;       /* #BA1E58 */
+  --info: 26 198 255;
+  --info-soft: 232 247 255;     /* #E8F7FF */
+  --info-text: 0 120 168;       /* #0078A8 */
+}

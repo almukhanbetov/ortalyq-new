@@ -1,0 +1,110 @@
+// Package router wires all modules into the Gin engine.
+package router
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"ortalyq/backend/internal/config"
+	"ortalyq/backend/internal/mail"
+	"ortalyq/backend/internal/middleware"
+	"ortalyq/backend/internal/modules/attempts"
+	"ortalyq/backend/internal/modules/auth"
+	"ortalyq/backend/internal/modules/chat"
+	"ortalyq/backend/internal/modules/classrooms"
+	"ortalyq/backend/internal/modules/exercises"
+	"ortalyq/backend/internal/modules/grading"
+	"ortalyq/backend/internal/modules/homework"
+	"ortalyq/backend/internal/modules/marathons"
+	"ortalyq/backend/internal/modules/materials"
+	"ortalyq/backend/internal/modules/uploads"
+	"ortalyq/backend/internal/modules/users"
+	"ortalyq/backend/internal/realtime"
+)
+
+type App struct {
+	Engine *gin.Engine
+	Auth   *auth.Service
+	// Mail sends the outbox after commits (Run in serve; tests call DispatchOnce).
+	Mail *mail.Dispatcher
+}
+
+// New constructs every module with explicit dependencies.
+func New(cfg config.Config, pool *pgxpool.Pool) (*App, error) {
+	if !cfg.IsLocal() {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	hub := realtime.NewHub(cfg.AllowedOrigins)
+
+	authRepo := auth.NewRepository(pool)
+	authSvc := auth.NewService(authRepo, auth.Options{
+		SessionTTL: cfg.SessionTTL, MaxPerEmail: cfg.LoginMaxPerEmail, MaxPerIP: cfg.LoginMaxPerIP, FailureWindow: cfg.LoginWindow,
+	})
+	authH := auth.NewHandler(authSvc, auth.CookieConfig{
+		Name: cfg.CookieName, Secure: cfg.CookieSecure, Domain: cfg.CookieDomain, MaxAge: int(cfg.SessionTTL.Seconds()),
+	})
+
+	usersSvc := users.NewService(users.NewRepository(pool), authRepo)
+	classSvc := classrooms.NewService(classrooms.NewRepository(pool), usersSvc, hub)
+	matSvc := materials.NewService(materials.NewRepository(pool), classSvc)
+	classSvc.SetLessonOwnership(matSvc)
+
+	exSvc := exercises.NewService(exercises.NewRepository(pool), matSvc, classSvc)
+	hwRepo := homework.NewRepository(pool)
+	marRepo := marathons.NewRepository(pool)
+	// marRepo implements attempts.LessonReviewState: answers of a marathon lesson on the teacher's review are locked.
+	attSvc := attempts.NewService(attempts.NewRepository(pool), exSvc, classSvc, hwRepo, marRepo, matSvc, hub)
+	hwSvc := homework.NewService(hwRepo, classSvc, attSvc, hub)
+	gradeSvc := grading.NewService(grading.NewRepository(pool), classSvc, matSvc, attSvc, hub)
+
+	upSvc, err := uploads.NewService(uploads.NewRepository(pool), classSvc, cfg.UploadDir, cfg.UploadMaxBytes)
+	if err != nil {
+		return nil, err
+	}
+	chatSvc := chat.NewService(chat.NewRepository(pool), classSvc, upSvc, chat.NewGiphy(cfg.GiphyAPIKey, cfg.GiphyAPIBase), hub)
+
+	r := gin.New()
+	r.Use(middleware.Recovery(), middleware.Logger(), middleware.SecurityHeaders(),
+		middleware.CORS(cfg.AllowedOrigins), middleware.OriginGuard(cfg.AllowedOrigins))
+	r.MaxMultipartMemory = 8 << 20
+
+	r.GET("/healthz", func(c *gin.Context) {
+		if err := pool.Ping(c.Request.Context()); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "db_unavailable"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	api := r.Group("/api", authH.LoadSession())
+	authed := api.Group("", auth.RequireAuth())
+	authH.Register(api, authed)
+	users.NewHandler(usersSvc).Register(authed)
+	classrooms.NewHandler(classSvc, hub).Register(authed)
+	materials.NewHandler(matSvc).Register(authed)
+	exercises.NewHandler(exSvc).Register(authed)
+	attempts.NewHandler(attSvc).Register(authed)
+	homework.NewHandler(hwSvc).Register(authed)
+	grading.NewHandler(gradeSvc).Register(authed)
+	uploads.NewHandler(upSvc).Register(authed)
+	chat.NewHandler(chatSvc).Register(authed)
+	marSvc := marathons.NewService(marRepo, classSvc, matSvc, matSvc, attSvc, usersSvc, hub)
+	classSvc.SetMarathonGate(marSvc)
+	sender, err := mail.NewSender(mail.Config{Driver: cfg.MailDriver, SMTPAddr: cfg.MailSMTPAddr, From: cfg.MailFrom, Username: cfg.MailUser, Password: cfg.MailPassword})
+	if err != nil {
+		return nil, err
+	}
+	mailer := mail.NewDispatcher(pool, sender)
+	marSvc.SetInvitations(mailer, usersSvc, cfg.AppURL)
+	marSvc.SetImages(upSvc)
+	marH := marathons.NewHandler(marSvc)
+	marH.Register(authed)
+	marH.RegisterPublic(api)
+
+	r.NoRoute(func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "not_found", "message": "Маршрут не найден"}})
+	})
+	return &App{Engine: r, Auth: authSvc, Mail: mailer}, nil
+}

@@ -1,0 +1,36 @@
+# Go
+backend/data/
+backend/*.test
+backend/api
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo
+frontend/*.tsbuildinfo
+
+# Env files with real values (examples are committed)
+.env
+.env.local
+backend/.env
+frontend/.env.local
+
+# E2E failure artefacts
+docs/screenshots/fail-*.png
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Edvibe reference material (screenshots of a third-party product with personal accounts, observation notes,
+# exports with real e-mails) stays local and is not published. Only the implementation plan is kept.
+docs/reference/classes/*
+!docs/reference/classes/marathon-implementation-plan.md
+
+# Local scratch: test stands, logs, database dumps
+*.log
+*.dump
+*.sql.gz
