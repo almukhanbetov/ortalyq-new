@@ -1,6 +1,7 @@
 // Typed endpoint functions grouped by domain.
 import { api, request } from './client';
 import type {
+  StudentInviteAccepted, StudentInviteLink, StudentInviteSent,
   Appearance, AppearanceRequest, EffectiveAppearance, ImageSlot, MarathonAppearance,
   Assignment, Attachment, CatalogEntry, Category, ChatMessage, Classroom, Course, Exercise, ExerciseStats, ExerciseView,
   FilterOptions, Gif, Grade, InvitationInfo, InviteResult, MarathonInvitation, HomeworkStatus, HomeworkView, Lesson, LessonAttrs, LessonFilter, ListResponse, MarathonLessonCopied, MarathonLessonFields, MarathonLessonReview, MarathonLessons, MarathonMe, MarathonMode, MarathonPassage, MarathonLessonComment, MarathonLessonResults, MarathonMyResults, MarathonReviewRequest, MarathonStudentsRating, MarathonSaveRequest, MarathonStats, MarathonStatsSettings, MarathonUnlockAfter, MarathonStudent, MarathonStudentProgress, Me, Progress,
@@ -19,6 +20,22 @@ export const signupApi = {
   requestEmail: (body: { email: string; locale: string; accept_terms: boolean }) => api.post<SignupRequested>('/signup/email', body),
   verify: (token: string) => api.post<SignupLink>('/signup/verify', { token }),
   complete: (token: string, password: string) => api.post<Me>('/signup/complete', { token, password }),
+};
+
+/** Password reset by e-mail. The token goes in the body, never in a URL. */
+export const resetApi = {
+  request: (body: { email: string; locale: string }) => api.post<SignupRequested>('/password-reset/request', body),
+  verify: (token: string) => api.post<SignupLink>('/password-reset/verify', { token }),
+  complete: (token: string, password: string) => api.post<void>('/password-reset/complete', { token, password }),
+};
+
+/** Invitations of a private teacher to a student by e-mail. Tokens go in the body, never in a URL. */
+export const studentInvitesApi = {
+  invite: (body: { email: string; locale: string }) => api.post<StudentInviteSent>('/teacher/invitations', body),
+  verify: (token: string) => api.post<StudentInviteLink>('/student-invitations/verify', { token }),
+  accept: (token: string) => api.post<StudentInviteAccepted>('/student-invitations/accept', { token }),
+  register: (body: { token: string; full_name: string; password: string; accept_terms: boolean }) =>
+    api.post<Me>('/student-invitations/register', body),
 };
 
 export const adminApi = {

@@ -84,6 +84,7 @@ func serve(cfg config.Config) error {
 			case <-t.C:
 				_ = app.Auth.Cleanup(ctx)
 				_ = app.Signup.Cleanup(ctx)
+				_ = app.PasswordReset.Cleanup(ctx)
 			}
 		}
 	}()

@@ -228,7 +228,13 @@ func (s *Service) Create(ctx context.Context, p auth.Principal, req CreateReques
 	if err != nil {
 		return nil, err
 	}
-	v.Check(ok, "student_id", "Выберите ученика, назначенного вам администратором")
+	// The same rule for both kinds of teacher: only a student linked to the caller (teacher_students). School teachers
+	// get students from the administrator, a private teacher from accepted invitations.
+	if p.Role == auth.RolePrivateTeacher {
+		v.Check(ok, "student_id", "Выберите ученика, принявшего ваше приглашение")
+	} else {
+		v.Check(ok, "student_id", "Выберите ученика, назначенного вам администратором")
+	}
 	if err := v.Err(); err != nil {
 		return nil, err
 	}

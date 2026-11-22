@@ -1,18 +1,18 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useMutation } from '@tanstack/react-query';
-import { MailCheck } from 'lucide-react';
 import { Button, ChoiceMark, Field, Input } from '@/components/ui';
 import { ApiError } from '@/lib/api/client';
 import { signupApi } from '@/lib/api/endpoints';
 import { errorMessage } from '@/lib/errors';
 import { useI18n } from '@/lib/i18n';
 import { AuthCard, FormAlert } from './AuthCard';
+import { CheckMailCard, clock, retryAfter, useCountdown } from './emailLink';
 
 /** "I accept the {terms} and the {privacy}" with both placeholders rendered as links. */
-function Consent() {
+export function Consent() {
   const { t } = useI18n();
   const links: Record<string, { href: string; label: string }> = {
     terms: { href: '/terms', label: t('signup.terms') },
@@ -28,27 +28,6 @@ function Consent() {
       })}
     </>
   );
-}
-
-/** Seconds left until a deadline set from a server answer; re-renders once a second while it runs. */
-function useCountdown() {
-  const [until, setUntil] = useState(0);
-  const [, tick] = useState(0);
-  const left = Math.max(0, Math.ceil((until - Date.now()) / 1000));
-  useEffect(() => {
-    if (left <= 0) return;
-    const id = setTimeout(() => tick((n) => n + 1), ((until - Date.now()) % 1000 || 1000) + 20);
-    return () => clearTimeout(id);
-  });
-  const start = useCallback((sec: number) => setUntil(Date.now() + sec * 1000), []);
-  return [left, start] as const;
-}
-
-/** 42 → "0:42", 300 → "5:00". */
-const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
-
-function retryAfter(err: unknown): number {
-  return err instanceof ApiError && err.status === 429 ? Number(err.fields.retry_after) || 60 : 0;
 }
 
 /**
@@ -106,23 +85,10 @@ export function SignupForm() {
 
   if (sentTo) {
     return (
-      <AuthCard title={t('signup.sentTitle')}
-        footer={<>{t('signup.haveAccount')} <Link href="/login" className="font-medium text-primary-text hover:underline">{t('signup.login')}</Link></>}>
-        <div className="flex flex-col gap-4">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary-text"><MailCheck size={24} aria-hidden /></span>
-          <p className="text-base text-ink" aria-live="polite">
-            {t(resent ? 'signup.resentText' : 'signup.sentText', { email: sentTo })}
-          </p>
-          <p className="text-sm text-ink-muted">{t('signup.sentHint')}</p>
-          {message && <FormAlert>{message}</FormAlert>}
-          <div className="flex flex-col gap-2">
-            <Button block disabled={left > 0} loading={request.isPending} onClick={() => request.mutate(sentTo)}>
-              {left > 0 && !waiting ? t('signup.resendIn', { time: clock(left) }) : t('signup.resend')}
-            </Button>
-            <Button block variant="secondary" onClick={changeEmail}>{t('signup.changeEmail')}</Button>
-          </div>
-        </div>
-      </AuthCard>
+      <CheckMailCard text={t(resent ? 'signup.resentText' : 'signup.sentText', { email: sentTo })} hint={t('signup.sentHint')}
+        message={message} left={left} waiting={waiting} pending={request.isPending}
+        onResend={() => request.mutate(sentTo)} onChangeEmail={changeEmail}
+        footer={<>{t('signup.haveAccount')} <Link href="/login" className="font-medium text-primary-text hover:underline">{t('signup.login')}</Link></>} />
     );
   }
 

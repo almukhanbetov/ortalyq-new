@@ -665,6 +665,12 @@ export interface EffectiveAppearance {
   background: { preset: MarathonBackground; image_id: string | null } | null;
 }
 
-// Private teacher sign-up.
+// Private teacher sign-up; the password reset answers with the same shapes.
 export interface SignupRequested { resend_after: number }
 export interface SignupLink { email: string; expires_at: string }
+
+/** «Пригласить ученика» of a private teacher. */
+export interface StudentInviteSent { email: string; expires_at: string; resend_after: number }
+/** The invitation link page: who invites, the address, and whether to sign in or create an account. */
+export interface StudentInviteLink { teacher_name: string; email: string; expires_at: string; has_account: boolean }
+export interface StudentInviteAccepted { teacher_name: string }

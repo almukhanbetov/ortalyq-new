@@ -81,11 +81,12 @@ try {
   await visible(A.getByRole('heading', { name: 'Вход в Bilimway' }), 'login title after switch');
   await visible(A.getByText('Демонстрационные аккаунты доступны только в локальной среде'), 'demo hint in the local build');
   if (await A.getByRole('button', { name: /Google/ }).count()) throw new Error('Google button shown without the flow');
-  if (await A.getByRole('link', { name: /Забыли|восстанов/i }).count()) throw new Error('recovery link shown without the flow');
+  // Password reset is connected: the sign-in form links to it.
+  await visible(A.getByRole('link', { name: 'Забыли пароль?' }), 'forgot password link');
   await sw.getByRole('link', { name: 'Регистрация' }).click();
   await A.waitForURL('**/signup');
   if ((await A.getByRole('textbox').count()) !== 1) throw new Error('sign-up must have exactly one text field');
-  log('switch between sign-in and sign-up; no Google button or recovery link');
+  log('switch between sign-in and sign-up; no Google button; «Забыли пароль?» link');
   await visible(A.getByRole('heading', { name: 'Регистрация преподавателя' }), 'sign-up title');
   await visible(A.getByRole('link', { name: 'условия использования' }), 'terms link');
   await visible(A.getByRole('link', { name: 'политику конфиденциальности' }), 'privacy link');

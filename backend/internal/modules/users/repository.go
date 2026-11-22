@@ -157,3 +157,53 @@ func (r *Repository) CreateSelfRegistered(ctx context.Context, q database.Querie
 		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`, email, name, role, hash, color, termsAt).Scan(&id)
 	return id, err
 }
+
+// ActiveAccountByEmail returns the id of the active (not disabled) account with the address, case-insensitively.
+func (r *Repository) ActiveAccountByEmail(ctx context.Context, q database.Querier, email string) (uuid.UUID, bool, error) {
+	var id uuid.UUID
+	err := q.QueryRow(ctx, `SELECT id FROM users WHERE lower(email) = lower($1) AND disabled_at IS NULL`, email).Scan(&id)
+	if database.IsNoRows(err) {
+		return uuid.Nil, false, nil
+	}
+	return id, err == nil, err
+}
+
+// ActiveAccountByID returns the address of the account when it exists and is not disabled.
+func (r *Repository) ActiveAccountByID(ctx context.Context, q database.Querier, id uuid.UUID) (string, bool, error) {
+	var email string
+	err := q.QueryRow(ctx, `SELECT email FROM users WHERE id = $1 AND disabled_at IS NULL`, id).Scan(&email)
+	if database.IsNoRows(err) {
+		return "", false, nil
+	}
+	return email, err == nil, err
+}
+
+// SetPassword replaces the password hash only; id, role and the rest of the account stay unchanged.
+func (r *Repository) SetPassword(ctx context.Context, q database.Querier, id uuid.UUID, hash string) error {
+	_, err := q.Exec(ctx, `UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1`, id, hash)
+	return err
+}
+
+// ActiveProfile returns the name, role and address of an account that exists and is not disabled.
+func (r *Repository) ActiveProfile(ctx context.Context, q database.Querier, id uuid.UUID) (name, role, email string, ok bool, err error) {
+	err = q.QueryRow(ctx, `SELECT full_name, role, email FROM users WHERE id = $1 AND disabled_at IS NULL`, id).Scan(&name, &role, &email)
+	if database.IsNoRows(err) {
+		return "", "", "", false, nil
+	}
+	return name, role, email, err == nil, err
+}
+
+// LinkInvitedStudent links a student to a private teacher after an accepted invitation (inside the caller's
+// transaction). A repeat is harmless.
+func (r *Repository) LinkInvitedStudent(ctx context.Context, q database.Querier, teacherID, studentID, invitationID uuid.UUID) error {
+	_, err := q.Exec(ctx, `INSERT INTO teacher_students (teacher_id, student_id, assigned_by, invitation_id) VALUES ($1, $2, $1, $3)
+		ON CONFLICT DO NOTHING`, teacherID, studentID, invitationID)
+	return err
+}
+
+// IsLinked is IsAssigned inside the caller's transaction.
+func (r *Repository) IsLinked(ctx context.Context, q database.Querier, teacherID, studentID uuid.UUID) (bool, error) {
+	var ok bool
+	err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM teacher_students WHERE teacher_id = $1 AND student_id = $2)`, teacherID, studentID).Scan(&ok)
+	return ok, err
+}

@@ -167,6 +167,16 @@ func (s *Service) UpdatePrefs(ctx context.Context, p Principal, req UpdateMeRequ
 
 func (s *Service) Cleanup(ctx context.Context) error { return s.repo.DeleteExpired(ctx) }
 
+// RevokeAfterPasswordChange ends every session of the user (all devices) and clears the failed sign-in attempts of
+// the address, inside the caller's transaction q, so the new password works at once and old sessions do not.
+func (s *Service) RevokeAfterPasswordChange(ctx context.Context, q database.Querier, userID uuid.UUID, email string) error {
+	r := NewRepository(q)
+	if err := r.DeleteUserSessions(ctx, userID); err != nil {
+		return err
+	}
+	return r.ClearFailures(ctx, email)
+}
+
 func truncate(s string, n int) string {
 	if len(s) > n {
 		return s[:n]

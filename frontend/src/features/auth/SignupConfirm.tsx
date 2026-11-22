@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,6 +11,7 @@ import { errorMessage } from '@/lib/errors';
 import { useT } from '@/lib/i18n';
 import { qk } from '@/lib/queryKeys';
 import { AuthCard, FormAlert } from './AuthCard';
+import { useLinkToken } from './emailLink';
 
 const STORE = 'signup-token';
 type LinkProblem = 'invalid' | 'expired' | 'used';
@@ -21,37 +22,6 @@ function problemOf(err: unknown): LinkProblem | null {
   if (err.code === 'signup_link_used') return 'used';
   if (err.code === 'signup_link_invalid') return 'invalid';
   return null;
-}
-
-/**
- * Takes the token from the fragment of the letter link (#…), removes it from the address bar and keeps it for this
- * tab only, so a reload still works but the token does not stay in history.
- */
-function useLinkToken() {
-  const [token, setToken] = useState<string | null | undefined>(undefined);
-  const seen = useRef<string | null>(null); // survives the double effect run of React strict mode
-  useEffect(() => {
-    const read = () => {
-      const fromHash = window.location.hash.slice(1);
-      // A fragment that is present but malformed is an invalid link, not "use the stored one".
-      let tok = fromHash ? (/^[A-Za-z0-9_-]{43}$/.test(fromHash) ? fromHash : '') : seen.current;
-      seen.current = tok || null;
-      try {
-        if (tok) sessionStorage.setItem(STORE, tok);
-        else if (tok === null) tok = sessionStorage.getItem(STORE);
-        else sessionStorage.removeItem(STORE);
-        if (tok && !/^[A-Za-z0-9_-]{43}$/.test(tok)) tok = null;
-      } catch { /* storage unavailable: the token from the link still works */ }
-      if (window.location.hash) window.history.replaceState(null, '', window.location.pathname);
-      setToken(tok || null);
-    };
-    read();
-    // Another link opened in the same tab changes only the fragment: the page is not remounted.
-    window.addEventListener('hashchange', read);
-    return () => window.removeEventListener('hashchange', read);
-  }, []);
-  const forget = () => { try { sessionStorage.removeItem(STORE); } catch { /* ignore */ } };
-  return [token, forget] as const;
 }
 
 function Problem({ kind }: { kind: LinkProblem }) {
@@ -74,7 +44,7 @@ export function SignupConfirm() {
   const t = useT();
   const router = useRouter();
   const qc = useQueryClient();
-  const [token, forget] = useLinkToken();
+  const [token, forget] = useLinkToken(STORE);
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');
   const [mismatch, setMismatch] = useState(false);

@@ -73,3 +73,23 @@ func TestSignupTemplates(t *testing.T) {
 		}
 	}
 }
+
+func TestPasswordResetTemplate(t *testing.T) {
+	for _, l := range append(mail.Locales, "de") {
+		m := mail.PasswordReset(l, mail.PasswordResetData{To: "a@b.kz", Link: "http://x/reset-password#T", Minutes: 60})
+		if m.To != "a@b.kz" || !strings.Contains(m.Text, "http://x/reset-password#T") || !strings.Contains(m.Text, "60") ||
+			!strings.Contains(m.Text, "a@b.kz") || !strings.Contains(m.Subject, "bilimway.kz") || strings.Contains(m.Text, "{") {
+			t.Fatalf("reset %s: %+v", l, m)
+		}
+	}
+}
+
+func TestStudentInvitationTemplate(t *testing.T) {
+	for _, l := range append(mail.Locales, "de") {
+		m := mail.StudentInvitation(l, mail.StudentInvitationData{To: "s@b.kz", Teacher: "Айгуль Н.", Link: "http://x/student-invite#T", Days: 7})
+		if m.To != "s@b.kz" || !strings.Contains(m.Text, "http://x/student-invite#T") || !strings.Contains(m.Text, "7") ||
+			!strings.Contains(m.Text, "s@b.kz") || !strings.Contains(m.Subject, "Айгуль Н.") || strings.Contains(m.Text, "{") {
+			t.Fatalf("student invitation %s: %+v", l, m)
+		}
+	}
+}

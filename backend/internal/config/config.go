@@ -41,6 +41,12 @@ type Config struct {
 	SignupResendAfter time.Duration
 	SignupMaxPerEmail int
 	SignupMaxPerIP    int
+	// Password reset limits; zero values use the defaults of the passwordreset module (1 h link, 60 s pause, 5 letters
+	// per address and 20 per IP an hour). Not read from the environment: tests override them.
+	ResetLinkTTL     time.Duration
+	ResetResendAfter time.Duration
+	ResetMaxPerEmail int
+	ResetMaxPerIP    int
 }
 
 func (c Config) IsLocal() bool { return c.Env == "local" }

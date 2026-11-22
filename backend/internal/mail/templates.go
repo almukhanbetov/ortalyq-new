@@ -99,3 +99,74 @@ func SignupConfirm(locale string, d SignupData) Message {
 func SignupExisting(locale string, d SignupData) Message {
 	return signupLetter(signupExistingTexts, locale, d)
 }
+
+// PasswordResetData fills the password reset letter (bilimway.kz).
+type PasswordResetData struct {
+	To      string
+	Link    string // one-time reset link
+	Minutes int    // how long the link works
+}
+
+var passwordResetTexts = map[string][2]string{
+	"ru": {"Восстановление пароля на bilimway.kz",
+		"Здравствуйте!\n\nМы получили запрос на восстановление пароля для аккаунта {email} на bilimway.kz.\n\n" +
+			"Чтобы задать новый пароль, откройте ссылку:\n{link}\n\n" +
+			"Ссылка действует {minutes} мин и работает один раз. После смены пароля все входы в аккаунт будут завершены.\n\n" +
+			"Если вы не запрашивали восстановление, просто проигнорируйте это письмо: пароль не изменится."},
+	"kk": {"bilimway.kz сайтында құпиясөзді қалпына келтіру",
+		"Сәлеметсіз бе!\n\nbilimway.kz сайтындағы {email} есептік жазбасының құпиясөзін қалпына келтіру сұрауын алдық.\n\n" +
+			"Жаңа құпиясөз орнату үшін сілтемені ашыңыз:\n{link}\n\n" +
+			"Сілтеме {minutes} минут жарамды және бір рет қана жұмыс істейді. Құпиясөз өзгергеннен кейін есептік жазбаға барлық кірулер аяқталады.\n\n" +
+			"Егер сіз қалпына келтіруді сұрамаған болсаңыз, бұл хатты елемеңіз: құпиясөз өзгермейді."},
+	"en": {"Reset your password on bilimway.kz",
+		"Hello!\n\nWe received a request to reset the password of the account {email} on bilimway.kz.\n\n" +
+			"To set a new password, open the link:\n{link}\n\n" +
+			"The link is valid for {minutes} min and works once. After the password is changed, all sign-ins to the account end.\n\n" +
+			"If you did not request a reset, just ignore this letter: your password will not change."},
+}
+
+// PasswordReset is the letter with the one-time reset link; it goes only to an existing, active account.
+func PasswordReset(locale string, d PasswordResetData) Message {
+	t, ok := passwordResetTexts[locale]
+	if !ok {
+		t = passwordResetTexts["ru"]
+	}
+	r := strings.NewReplacer("{email}", d.To, "{link}", d.Link, "{minutes}", strconv.Itoa(d.Minutes))
+	return Message{To: d.To, Subject: r.Replace(t[0]), Text: r.Replace(t[1])}
+}
+
+// StudentInvitationData fills the letter of a private teacher inviting a student (bilimway.kz).
+type StudentInvitationData struct {
+	To      string
+	Teacher string // full name of the teacher
+	Link    string // one-time invitation link
+	Days    int    // how long the link works
+}
+
+var studentInvitationTexts = map[string][2]string{
+	"ru": {"{teacher} приглашает вас на bilimway.kz",
+		"Здравствуйте!\n\n{teacher} приглашает вас заниматься на bilimway.kz.\n\n" +
+			"Чтобы принять приглашение, откройте ссылку:\n{link}\n\n" +
+			"Если у вас уже есть аккаунт ученика с адресом {email}, войдите в него. Если аккаунта нет, вы создадите его по этой ссылке.\n\n" +
+			"Ссылка действует {days} дн. и работает один раз. Если вы не ждали это письмо, просто проигнорируйте его."},
+	"kk": {"{teacher} сізді bilimway.kz сайтына шақырады",
+		"Сәлеметсіз бе!\n\n{teacher} сізді bilimway.kz сайтында оқуға шақырады.\n\n" +
+			"Шақыруды қабылдау үшін сілтемені ашыңыз:\n{link}\n\n" +
+			"Егер {email} мекенжайымен оқушы есептік жазбаңыз бар болса, оған кіріңіз. Есептік жазба болмаса, оны осы сілтеме арқылы құрасыз.\n\n" +
+			"Сілтеме {days} күн жарамды және бір рет қана жұмыс істейді. Егер бұл хатты күтпесеңіз, оны елемеңіз."},
+	"en": {"{teacher} invites you to bilimway.kz",
+		"Hello!\n\n{teacher} invites you to study on bilimway.kz.\n\n" +
+			"To accept the invitation, open the link:\n{link}\n\n" +
+			"If you already have a student account with the address {email}, sign in to it. If not, you will create one from this link.\n\n" +
+			"The link is valid for {days} days and works once. If you did not expect this letter, just ignore it."},
+}
+
+// StudentInvitation is the letter with the one-time link of a private teacher's invitation.
+func StudentInvitation(locale string, d StudentInvitationData) Message {
+	t, ok := studentInvitationTexts[locale]
+	if !ok {
+		t = studentInvitationTexts["ru"]
+	}
+	r := strings.NewReplacer("{email}", d.To, "{teacher}", d.Teacher, "{link}", d.Link, "{days}", strconv.Itoa(d.Days))
+	return Message{To: d.To, Subject: r.Replace(t[0]), Text: r.Replace(t[1])}
+}

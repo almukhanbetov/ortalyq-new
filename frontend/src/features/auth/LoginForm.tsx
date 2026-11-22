@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, Field, Input } from '@/components/ui';
@@ -25,6 +26,8 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  // After a password reset (/reset-password sends the user here).
+  const resetDone = params.get('reset') === 'done';
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -49,12 +52,18 @@ export function LoginForm() {
   return (
     <AuthCard tab="login" title={t('auth.title')} subtitle={t('auth.subtitle')}>
       <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+        {resetDone && !error && <p role="status" className="rounded-md bg-success-soft px-3 py-2 text-sm text-success-text">{t('reset.done')}</p>}
         <Field label={t('auth.email')} error={fields.email}>
           {(p) => <Input {...p} type="email" autoComplete="username" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} required />}
         </Field>
-        <Field label={t('auth.password')} error={fields.password}>
-          {(p) => <PasswordInput {...p} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />}
-        </Field>
+        <div className="flex flex-col gap-2">
+          <Field label={t('auth.password')} error={fields.password}>
+            {(p) => <PasswordInput {...p} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />}
+          </Field>
+          <Link href="/forgot-password" className="self-end rounded-sm text-sm font-medium text-primary-text hover:underline focus-visible:shadow-focus focus-visible:outline-none">
+            {t('reset.forgotLink')}
+          </Link>
+        </div>
         {error && !Object.keys(fields).length && <FormAlert>{error}</FormAlert>}
         <Button type="submit" size="lg" block loading={busy}>{busy ? t('auth.submitting') : t('auth.submit')}</Button>
         {IS_LOCAL && <p className="text-xs text-ink-muted">{t('auth.demoHint')}</p>}
