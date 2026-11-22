@@ -28,8 +28,16 @@ func NewService(repo *Repository, sessions SessionRevoker) *Service {
 
 var palette = []string{"#1AC6FF", "#FF7A45", "#9254DE", "#16C784", "#F759AB", "#FFB020", "#2F80ED"}
 
+// AvatarColor picks the default avatar colour of a new account from its address.
+func AvatarColor(email string) string {
+	if email == "" {
+		return palette[0]
+	}
+	return palette[int(email[0])%len(palette)]
+}
+
 func validRole(r string) bool {
-	return r == auth.RoleAdmin || r == auth.RoleTeacher || r == auth.RoleStudent
+	return r == auth.RoleAdmin || r == auth.RoleTeacher || r == auth.RoleStudent || r == auth.RolePrivateTeacher
 }
 
 func (s *Service) List(ctx context.Context, f ListFilter) ([]User, int, error) {
@@ -54,7 +62,7 @@ func (s *Service) Create(ctx context.Context, req CreateUserRequest) (*User, err
 	if err != nil {
 		return nil, err
 	}
-	color := palette[int(req.Email[0])%len(palette)]
+	color := AvatarColor(req.Email)
 	u, err := s.repo.Create(ctx, req.Email, req.FullName, req.Role, hash, color)
 	if database.IsUniqueViolation(err, "") {
 		return nil, apperr.Validation(map[string]string{"email": "Пользователь с таким email уже существует"})
@@ -63,7 +71,8 @@ func (s *Service) Create(ctx context.Context, req CreateUserRequest) (*User, err
 }
 
 func (s *Service) Update(ctx context.Context, actor auth.Principal, id uuid.UUID, req UpdateUserRequest) (*User, error) {
-	if _, err := s.repo.Get(ctx, id); err != nil {
+	cur, err := s.repo.Get(ctx, id)
+	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, apperr.NotFound("Пользователь")
 		}
@@ -78,6 +87,14 @@ func (s *Service) Update(ctx context.Context, actor auth.Principal, id uuid.UUID
 	if req.Role != nil {
 		v.Check(validRole(*req.Role), "role", "Неизвестная роль")
 		v.Check(id != actor.UserID || *req.Role == auth.RoleAdmin, "role", "Нельзя снять роль администратора с себя")
+		// A private teacher never has school students: assignments are removed by the administrator first.
+		if *req.Role == auth.RolePrivateTeacher && cur.Role != auth.RolePrivateTeacher {
+			has, err := s.repo.HasAssignments(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			v.Check(!has, "role", "Сначала снимите назначенных преподавателю учеников")
+		}
 	}
 	if req.Disabled != nil && *req.Disabled {
 		v.Check(id != actor.UserID, "disabled", "Нельзя заблокировать себя")
@@ -118,7 +135,8 @@ func (s *Service) Assign(ctx context.Context, actor auth.Principal, req Assignme
 		return apperr.Validation(map[string]string{"student_id": "Ученик не найден"})
 	}
 	v := apperr.V{}
-	v.Check(t.Role == auth.RoleTeacher, "teacher_id", "Пользователь не является преподавателем")
+	// School students are assigned to school teachers only; a private teacher (self sign-up) gets none.
+	v.Check(t.Role == auth.RoleTeacher, "teacher_id", "Пользователь не является преподавателем школы")
 	v.Check(st.Role == auth.RoleStudent, "student_id", "Пользователь не является учеником")
 	if err := v.Err(); err != nil {
 		return err
@@ -135,7 +153,7 @@ func (s *Service) Assignments(ctx context.Context, limit, offset int) ([]Assignm
 }
 
 func (s *Service) MyStudents(ctx context.Context, p auth.Principal) ([]User, error) {
-	if !p.IsTeacher() {
+	if !p.CanTeach() {
 		return nil, apperr.Forbidden()
 	}
 	return s.repo.StudentsOf(ctx, p.UserID)

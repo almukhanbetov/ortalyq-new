@@ -14,6 +14,7 @@ import { useDisclosure } from '@/hooks/useDisclosure';
 import type { Me } from '@/types/api';
 import { ClassroomCard, ClassroomRow, CreateClassTile } from './ClassroomCard';
 import { CreateClassroomModal } from './CreateClassroomModal';
+import { isTeaching } from '@/lib/roles';
 
 const LIMIT = 24;
 const VIEW_KEY = 'ortalyq_classes_view';
@@ -55,7 +56,7 @@ function store(key: string, v: string) {
 
 export function ClassroomList({ me }: { me: Me }) {
   const t = useT();
-  const teacher = me.role === 'teacher';
+  const teacher = isTeaching(me.role);
   // The URL is the single source of truth for the applied filter and search (?type=1|2|group&q=…).
   // The input keeps its own text and pushes it to the URL after a 250 ms pause.
   const params = useSearchParams();

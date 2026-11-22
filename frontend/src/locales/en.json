@@ -38,7 +38,8 @@
   "roles": {
     "admin": "Administrator",
     "teacher": "Teacher",
-    "student": "Student"
+    "student": "Student",
+    "private_teacher": "Private teacher"
   },
   "locales": {
     "ru": "Русский",
@@ -46,7 +47,7 @@
     "en": "English"
   },
   "auth": {
-    "title": "Sign in to ORTALYQ-NEW",
+    "title": "Sign in to Bilimway",
     "subtitle": "Online teaching platform",
     "email": "Email",
     "password": "Password",
@@ -985,5 +986,66 @@
     "tr": "Turkish",
     "uz": "Uzbek",
     "zh": "Chinese"
+  },
+  "signup": {
+    "title": "Teacher sign-up",
+    "subtitle": "Enter your email and we will send a link to confirm the address.",
+    "email": "Email",
+    "consent": "I accept the {terms} and the {privacy}",
+    "terms": "terms of use",
+    "privacy": "privacy policy",
+    "consentRequired": "Accept the terms and the policy to continue",
+    "submit": "Continue",
+    "submitting": "Sending…",
+    "haveAccount": "Already have an account?",
+    "login": "Sign in",
+    "sentTitle": "Check your email",
+    "sentText": "We sent a letter to {email}. Open it and follow the link to continue signing up.",
+    "sentHint": "No letter? Check the spam folder or request a new one. The link is valid for 24 hours; only the latest one works.",
+    "resend": "Send again",
+    "resendIn": "Send again in {time}",
+    "changeEmail": "Change email",
+    "tooMany": "Too many requests. You can request a new letter in {time}.",
+    "checking": "Checking the link…",
+    "passwordTitle": "Create a password",
+    "passwordSubtitle": "{email} is confirmed. Choose a password to sign in.",
+    "password": "Password",
+    "passwordHint": "8 to 72 characters",
+    "passwordRepeat": "Repeat the password",
+    "passwordMismatch": "The passwords do not match",
+    "create": "Create account",
+    "creating": "Creating the account…",
+    "linkInvalidTitle": "The link is not valid",
+    "linkInvalidText": "The link is damaged or incomplete. Open it from the letter in full or request a new letter.",
+    "linkExpiredTitle": "The link has expired",
+    "linkExpiredText": "A link is valid for 24 hours, and after a new letter only the latest one works. Request a new letter.",
+    "linkUsedTitle": "The link has already been used",
+    "linkUsedText": "An account with this address exists. Sign in with your email and password.",
+    "requestNew": "Request a new letter",
+    "welcomeTitle": "Welcome to Bilimway!",
+    "welcomeText": "Your account is ready. In the teacher cabinet you can prepare materials and exercises and run marathons.",
+    "welcomeLater": "Filling in the profile comes at a later stage.",
+    "toCabinet": "Go to the cabinet",
+    "resentText": "A new letter has been sent to {email}. The link from the previous letter no longer works."
+  },
+  "legal": {
+    "termsTitle": "Terms of use",
+    "privacyTitle": "Privacy policy",
+    "notPublished": "The text of the document has not been published yet. It will appear on this page.",
+    "back": "Back to sign-up"
+  },
+  "authLayout": {
+    "login": "Sign in",
+    "signup": "Sign up",
+    "switch": "Sign in or sign up",
+    "domain": "bilimway.kz",
+    "headline": "Online lessons and marathons in one cabinet",
+    "point1": "Materials and exercises for your lessons",
+    "point2": "Live lessons with your students",
+    "point3": "Marathons with ratings and results",
+    "languages": "Available in Russian, Kazakh and English",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "brand": "Bilimway"
   }
 }

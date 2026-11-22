@@ -9,6 +9,7 @@ import { adminApi } from '@/lib/api/endpoints';
 import { useT } from '@/lib/i18n';
 import { errorMessage, fieldErrors } from '@/lib/errors';
 import type { Role, User } from '@/types/api';
+import { ALL_ROLES } from '@/lib/roles';
 
 const LIMIT = 20;
 
@@ -50,7 +51,7 @@ function UsersTab() {
         </div>
         <Select className="w-auto min-w-[180px]" value={role} aria-label={t('admin.role')} onChange={(e) => { setRole(e.target.value); setOffset(0); }}>
           <option value="">{t('admin.allRoles')}</option>
-          {(['admin', 'teacher', 'student'] as Role[]).map((r) => <option key={r} value={r}>{t(`roles.${r}`)}</option>)}
+          {ALL_ROLES.map((r) => <option key={r} value={r}>{t(`roles.${r}`)}</option>)}
         </Select>
         <Button icon={<Plus size={18} />} onClick={() => setCreating(true)}>{t('admin.createUser')}</Button>
       </div>
@@ -78,7 +79,7 @@ function UsersTab() {
                       </td>
                       <td className="py-3">
                         <Select className="h-9 w-auto text-sm" value={u.role} aria-label={t('admin.role')} onChange={(e) => update.mutate({ id: u.id, body: { role: e.target.value } })}>
-                          {(['admin', 'teacher', 'student'] as Role[]).map((r) => <option key={r} value={r}>{t(`roles.${r}`)}</option>)}
+                          {ALL_ROLES.map((r) => <option key={r} value={r}>{t(`roles.${r}`)}</option>)}
                         </Select>
                       </td>
                       <td className="py-3">{u.disabled_at ? <Badge tone="danger">{t('admin.disabled')}</Badge> : <Badge tone="success">{t('admin.active')}</Badge>}</td>

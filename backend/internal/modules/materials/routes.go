@@ -8,7 +8,7 @@ import (
 
 // Register mounts teacher-only template management routes.
 func (h *Handler) Register(authed *gin.RouterGroup) {
-	t := authed.Group("", auth.RequireRole(auth.RoleTeacher))
+	t := authed.Group("", auth.RequireRole(auth.TeachingRoles...))
 	t.GET("/courses", h.ListCourses)
 	t.POST("/courses", h.CreateCourse)
 	t.PUT("/courses/order", h.ReorderCourses)

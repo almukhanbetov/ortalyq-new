@@ -8,7 +8,7 @@ import (
 
 func (h *Handler) Register(authed *gin.RouterGroup) {
 	authed.GET("/exercise-types", h.Catalog)
-	t := authed.Group("", auth.RequireRole(auth.RoleTeacher))
+	t := authed.Group("", auth.RequireRole(auth.TeachingRoles...))
 	t.GET("/lessons/:id/exercises", h.List)
 	t.POST("/lessons/:id/exercises", h.Create)
 	t.PUT("/lessons/:id/exercises/order", h.Reorder)

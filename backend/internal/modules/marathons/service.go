@@ -141,7 +141,7 @@ func (s *Service) owned(ctx context.Context, p auth.Principal, id uuid.UUID) (*c
 }
 
 func (s *Service) Create(ctx context.Context, p auth.Principal, req SaveRequest) (*classrooms.Classroom, error) {
-	if !p.IsTeacher() {
+	if !p.CanTeach() {
 		return nil, apperr.Forbidden()
 	}
 	if err := normalize(&req); err != nil {

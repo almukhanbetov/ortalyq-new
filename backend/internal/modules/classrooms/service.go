@@ -211,7 +211,7 @@ func (s *Service) Get(ctx context.Context, p auth.Principal, id uuid.UUID) (*Cla
 }
 
 func (s *Service) Create(ctx context.Context, p auth.Principal, req CreateRequest) (*Classroom, error) {
-	if !p.IsTeacher() {
+	if !p.CanTeach() {
 		return nil, apperr.Forbidden()
 	}
 	req.Name = strings.TrimSpace(req.Name)

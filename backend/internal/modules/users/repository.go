@@ -2,6 +2,7 @@ package users
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -132,4 +133,27 @@ func (r *Repository) StudentsOf(ctx context.Context, teacherID uuid.UUID) ([]Use
 		out = append(out, u)
 	}
 	return out, rows.Err()
+}
+
+// HasAssignments reports whether the user has students assigned as a teacher.
+func (r *Repository) HasAssignments(ctx context.Context, teacherID uuid.UUID) (bool, error) {
+	var ok bool
+	err := r.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM teacher_students WHERE teacher_id = $1)`, teacherID).Scan(&ok)
+	return ok, err
+}
+
+// EmailTaken reports whether any account (also a disabled one) uses the address, case-insensitively.
+// q may be a transaction.
+func (r *Repository) EmailTaken(ctx context.Context, q database.Querier, email string) (bool, error) {
+	var ok bool
+	err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM users WHERE lower(email) = lower($1))`, email).Scan(&ok)
+	return ok, err
+}
+
+// CreateSelfRegistered inserts an account created by the sign-up flow (inside the caller's transaction).
+func (r *Repository) CreateSelfRegistered(ctx context.Context, q database.Querier, email, name, role, hash, color string, termsAt time.Time) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := q.QueryRow(ctx, `INSERT INTO users (email, full_name, role, password_hash, avatar_color, terms_accepted_at)
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`, email, name, role, hash, color, termsAt).Scan(&id)
+	return id, err
 }

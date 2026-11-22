@@ -20,6 +20,7 @@ import (
 	"ortalyq/backend/internal/modules/homework"
 	"ortalyq/backend/internal/modules/marathons"
 	"ortalyq/backend/internal/modules/materials"
+	"ortalyq/backend/internal/modules/signup"
 	"ortalyq/backend/internal/modules/uploads"
 	"ortalyq/backend/internal/modules/users"
 	"ortalyq/backend/internal/realtime"
@@ -30,6 +31,8 @@ type App struct {
 	Auth   *auth.Service
 	// Mail sends the outbox after commits (Run in serve; tests call DispatchOnce).
 	Mail *mail.Dispatcher
+	// Signup is the private teacher sign-up (Cleanup in serve).
+	Signup *signup.Service
 }
 
 // New constructs every module with explicit dependencies.
@@ -110,8 +113,15 @@ func New(cfg config.Config, pool *pgxpool.Pool) (*App, error) {
 	marH.Register(authed)
 	marH.RegisterPublic(api)
 
+	// Self sign-up of a private teacher: letters through the same outbox, the role is set by the server.
+	usersRepo := users.NewRepository(pool)
+	signupSvc := signup.NewService(signup.NewRepository(pool), usersRepo, authSvc, mailer, users.AvatarColor, cfg.AppURL, signup.Options{
+		LinkTTL: cfg.SignupLinkTTL, ResendAfter: cfg.SignupResendAfter, MaxPerEmail: cfg.SignupMaxPerEmail, MaxPerIP: cfg.SignupMaxPerIP,
+	})
+	signup.NewHandler(signupSvc, authH.SetSessionCookie).Register(api)
+
 	r.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "not_found", "message": "Маршрут не найден"}})
 	})
-	return &App{Engine: r, Auth: authSvc, Mail: mailer}, nil
+	return &App{Engine: r, Auth: authSvc, Mail: mailer, Signup: signupSvc}, nil
 }

@@ -35,6 +35,12 @@ type Config struct {
 	MailUser     string
 	MailPassword string
 	AppURL       string
+	// Teacher sign-up limits; zero values use the defaults of the signup module (24 h link, 60 s pause, 5 letters per
+	// address and 20 per IP an hour). Not read from the environment: tests override them.
+	SignupLinkTTL     time.Duration
+	SignupResendAfter time.Duration
+	SignupMaxPerEmail int
+	SignupMaxPerIP    int
 }
 
 func (c Config) IsLocal() bool { return c.Env == "local" }

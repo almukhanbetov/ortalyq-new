@@ -3,6 +3,8 @@ import type { LessonFilter, Scope } from '@/types/api';
 
 export const qk = {
   me: ['me'] as const,
+  // The sign-up token stays in memory only (never in a URL the app builds).
+  signupLink: (token: string) => ['signup-link', token] as const,
   classrooms: (q = '') => ['classrooms', q] as const,
   classroom: (id: string) => ['classroom', id] as const,
   progress: (cid: string, lid: string, sid?: string) => ['progress', cid, lid, sid ?? 'self'] as const,

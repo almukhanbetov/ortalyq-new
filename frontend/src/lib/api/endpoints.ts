@@ -4,7 +4,7 @@ import type {
   Appearance, AppearanceRequest, EffectiveAppearance, ImageSlot, MarathonAppearance,
   Assignment, Attachment, CatalogEntry, Category, ChatMessage, Classroom, Course, Exercise, ExerciseStats, ExerciseView,
   FilterOptions, Gif, Grade, InvitationInfo, InviteResult, MarathonInvitation, HomeworkStatus, HomeworkView, Lesson, LessonAttrs, LessonFilter, ListResponse, MarathonLessonCopied, MarathonLessonFields, MarathonLessonReview, MarathonLessons, MarathonMe, MarathonMode, MarathonPassage, MarathonLessonComment, MarathonLessonResults, MarathonMyResults, MarathonReviewRequest, MarathonStudentsRating, MarathonSaveRequest, MarathonStats, MarathonStatsSettings, MarathonUnlockAfter, MarathonStudent, MarathonStudentProgress, Me, Progress,
-  SaveExerciseRequest, Scope, Section, User,
+  SaveExerciseRequest, Scope, Section, SignupLink, SignupRequested, User,
 } from '@/types/api';
 
 export const authApi = {
@@ -12,6 +12,13 @@ export const authApi = {
   login: (email: string, password: string) => api.post<Me>('/auth/login', { email, password }),
   logout: () => api.post<void>('/auth/logout'),
   updateMe: (body: Partial<Pick<Me, 'locale' | 'timezone'>>) => api.patch<Me>('/auth/me', body),
+};
+
+/** Private teacher sign-up. The token goes in the body, never in a URL. */
+export const signupApi = {
+  requestEmail: (body: { email: string; locale: string; accept_terms: boolean }) => api.post<SignupRequested>('/signup/email', body),
+  verify: (token: string) => api.post<SignupLink>('/signup/verify', { token }),
+  complete: (token: string, password: string) => api.post<Me>('/signup/complete', { token, password }),
 };
 
 export const adminApi = {

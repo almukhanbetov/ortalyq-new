@@ -59,3 +59,17 @@ func TestNewSender(t *testing.T) {
 		t.Fatal("unknown driver must fail")
 	}
 }
+
+func TestSignupTemplates(t *testing.T) {
+	for _, l := range append(mail.Locales, "de") {
+		c := mail.SignupConfirm(l, mail.SignupData{To: "a@b.kz", Link: "http://x/signup/confirm#T", Hours: 24})
+		if c.To != "a@b.kz" || !strings.Contains(c.Text, "http://x/signup/confirm#T") || !strings.Contains(c.Text, "24") ||
+			!strings.Contains(c.Text, "a@b.kz") || !strings.Contains(c.Subject, "bilimway.kz") || strings.Contains(c.Text, "{") {
+			t.Fatalf("confirm %s: %+v", l, c)
+		}
+		x := mail.SignupExisting(l, mail.SignupData{To: "a@b.kz", Link: "http://x/login"})
+		if !strings.Contains(x.Text, "http://x/login") || strings.Contains(x.Text, "confirm") || strings.Contains(x.Text, "{") {
+			t.Fatalf("existing %s: %+v", l, x)
+		}
+	}
+}

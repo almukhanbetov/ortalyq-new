@@ -23,6 +23,13 @@ const sizes: Record<Size, string> = {
   lg: 'h-12 px-6 text-md gap-2 rounded-lg',
 };
 
+const base = 'inline-flex select-none items-center justify-center whitespace-nowrap font-medium transition-colors duration-150 disabled:cursor-not-allowed';
+
+/** Button look for a link (`<Link className={buttonClass()}>`), so no button is nested inside an anchor. */
+export function buttonClass({ variant = 'primary', size = 'md', block }: { variant?: Variant; size?: Size; block?: boolean } = {}) {
+  return cn(base, variants[variant], sizes[size], block && 'w-full', 'focus-visible:shadow-focus focus-visible:outline-none');
+}
+
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
@@ -42,7 +49,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        'inline-flex select-none items-center justify-center whitespace-nowrap font-medium transition-colors duration-150 disabled:cursor-not-allowed',
+        base,
         variants[variant],
         sizes[size],
         block && 'w-full',

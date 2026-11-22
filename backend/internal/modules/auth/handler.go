@@ -23,13 +23,20 @@ type Handler struct {
 	cookie CookieConfig
 }
 
-func NewHandler(svc *Service, cookie CookieConfig) *Handler { return &Handler{svc: svc, cookie: cookie} }
+func NewHandler(svc *Service, cookie CookieConfig) *Handler {
+	return &Handler{svc: svc, cookie: cookie}
+}
 
 func (h *Handler) setCookie(c *gin.Context, value string, maxAge int) {
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name: h.cookie.Name, Value: value, Path: "/", Domain: h.cookie.Domain,
 		MaxAge: maxAge, HttpOnly: true, Secure: h.cookie.Secure, SameSite: http.SameSiteLaxMode,
 	})
+}
+
+// SetSessionCookie gives the browser a session token issued by the service (used by the sign-up flow).
+func (h *Handler) SetSessionCookie(c *gin.Context, token string) {
+	h.setCookie(c, token, h.cookie.MaxAge)
 }
 
 func (h *Handler) Login(c *gin.Context) {

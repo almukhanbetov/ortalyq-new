@@ -7,7 +7,7 @@ import (
 )
 
 func (h *Handler) Register(authed *gin.RouterGroup) {
-	t := authed.Group("", auth.RequireRole(auth.RoleTeacher))
+	t := authed.Group("", auth.RequireRole(auth.TeachingRoles...))
 	t.GET("/marathon-languages", h.Languages)
 	t.POST("/marathons", h.Create)
 	t.PATCH("/marathons/:cid", h.Update)

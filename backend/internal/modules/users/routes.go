@@ -15,5 +15,5 @@ func (h *Handler) Register(authed *gin.RouterGroup) {
 	admin.POST("/assignments", h.Assign)
 	admin.DELETE("/assignments", h.Unassign)
 
-	authed.GET("/teacher/students", auth.RequireRole(auth.RoleTeacher), h.MyStudents)
+	authed.GET("/teacher/students", auth.RequireRole(auth.TeachingRoles...), h.MyStudents)
 }

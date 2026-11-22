@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"ortalyq/backend/internal/apperr"
@@ -89,15 +90,38 @@ func (s *Service) Login(ctx context.Context, email, password, ip, ua string) (st
 	_ = s.repo.ClearFailures(ctx, email)
 	_ = s.repo.RecordAttempt(ctx, email, ip, true)
 
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
-		return "", Principal{}, err
-	}
-	token := base64.RawURLEncoding.EncodeToString(raw)
-	if err := s.repo.CreateSession(ctx, hashToken(token), u.UserID, s.now().Add(s.opt.SessionTTL), truncate(ua, 300), ip); err != nil {
+	token, err := s.newSession(ctx, u.UserID, ip, ua)
+	if err != nil {
 		return "", Principal{}, err
 	}
 	return token, u.Principal, nil
+}
+
+func (s *Service) newSession(ctx context.Context, userID uuid.UUID, ip, ua string) (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	token := base64.RawURLEncoding.EncodeToString(raw)
+	if err := s.repo.CreateSession(ctx, hashToken(token), userID, s.now().Add(s.opt.SessionTTL), truncate(ua, 300), ip); err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+// StartSession signs in a user that has just proved control of the address in another way (the sign-up link
+// followed by a new password). Disabled accounts get no session.
+func (s *Service) StartSession(ctx context.Context, userID uuid.UUID, ip, ua string) (string, Principal, error) {
+	token, err := s.newSession(ctx, userID, ip, ua)
+	if err != nil {
+		return "", Principal{}, err
+	}
+	p, err := s.Authenticate(ctx, token)
+	if err != nil {
+		_ = s.repo.DeleteSession(ctx, hashToken(token))
+		return "", Principal{}, err
+	}
+	return token, p, nil
 }
 
 // Authenticate resolves a session token into a principal (sliding expiration).

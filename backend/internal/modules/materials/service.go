@@ -45,7 +45,7 @@ func (s *Service) OwnedLesson(ctx context.Context, p auth.Principal, lessonID uu
 		}
 		return nil, err
 	}
-	if !p.IsTeacher() || ref.OwnerID != p.UserID {
+	if !p.CanTeach() || ref.OwnerID != p.UserID {
 		return nil, apperr.NotFound("Урок")
 	}
 	return ref, nil

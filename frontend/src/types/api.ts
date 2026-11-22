@@ -1,6 +1,7 @@
 // DTOs mirrored from the Go API. One source of truth for the frontend.
 
-export type Role = 'admin' | 'teacher' | 'student';
+/** private_teacher: registered on their own (sign-up); teacher cabinet without school-assigned students. */
+export type Role = 'admin' | 'teacher' | 'private_teacher' | 'student';
 export type Locale = 'ru' | 'kk' | 'en';
 
 export interface Me {
@@ -663,3 +664,7 @@ export interface EffectiveAppearance {
   reactions: Reactions | null;
   background: { preset: MarathonBackground; image_id: string | null } | null;
 }
+
+// Private teacher sign-up.
+export interface SignupRequested { resend_after: number }
+export interface SignupLink { email: string; expires_at: string }

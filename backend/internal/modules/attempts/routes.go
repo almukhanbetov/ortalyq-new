@@ -15,7 +15,7 @@ func (h *Handler) Register(authed *gin.RouterGroup) {
 	authed.POST("/attempts/:aid/finish", h.Finish)
 
 	// Teacher preview (stage 8): the lesson owner only; separate preview attempts, no classroom.
-	t := authed.Group("/preview", auth.RequireRole(auth.RoleTeacher))
+	t := authed.Group("/preview", auth.RequireRole(auth.TeachingRoles...))
 	t.GET("/lessons/:lid/exercises", h.PreviewLesson)
 	t.POST("/lessons/:lid/reset", h.PreviewResetLesson)
 	t.GET("/exercises/:eid", h.PreviewView)

@@ -8,7 +8,7 @@ import (
 
 func (h *Handler) Register(authed *gin.RouterGroup) {
 	authed.GET("/classrooms", h.List)
-	authed.POST("/classrooms", auth.RequireRole(auth.RoleTeacher), h.Create)
+	authed.POST("/classrooms", auth.RequireRole(auth.TeachingRoles...), h.Create)
 	authed.GET("/classrooms/:cid", h.Get)
 	authed.PATCH("/classrooms/:cid", h.Rename)
 	authed.PUT("/classrooms/:cid/current-lesson", h.SetCurrentLesson)

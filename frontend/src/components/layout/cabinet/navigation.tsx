@@ -9,15 +9,15 @@ const ICON = 20;
 
 /** Single source of the cabinet menu. Unbuilt sections lead to the honest "in development" page. */
 export const CABINET_NAV: CabinetNavItem[] = [
-  { href: '/welcome', key: 'welcome', icon: <Hand size={ICON} />, roles: ['teacher', 'student', 'admin'] },
-  { href: CLASSES_ROUTE, key: 'classes', icon: <GraduationCap size={ICON} />, roles: ['teacher', 'student'], also: [MARATHONS_ROUTE] },
+  { href: '/welcome', key: 'welcome', icon: <Hand size={ICON} />, roles: ['teacher', 'private_teacher', 'student', 'admin'] },
+  { href: CLASSES_ROUTE, key: 'classes', icon: <GraduationCap size={ICON} />, roles: ['teacher', 'private_teacher', 'student'], also: [MARATHONS_ROUTE] },
   { href: '/students', key: 'students', icon: <Users size={ICON} />, roles: ['teacher'] },
-  { href: '/materials', key: 'materials', icon: <BookOpen size={ICON} />, roles: ['teacher'] },
-  { href: '/schedule', key: 'schedule', icon: <CalendarDays size={ICON} />, roles: ['teacher', 'student'] },
-  { href: '/site', key: 'site', icon: <Globe size={ICON} />, roles: ['teacher'] },
-  { href: '/pricing', key: 'pricing', icon: <CreditCard size={ICON} />, roles: ['teacher'] },
+  { href: '/materials', key: 'materials', icon: <BookOpen size={ICON} />, roles: ['teacher', 'private_teacher'] },
+  { href: '/schedule', key: 'schedule', icon: <CalendarDays size={ICON} />, roles: ['teacher', 'private_teacher', 'student'] },
+  { href: '/site', key: 'site', icon: <Globe size={ICON} />, roles: ['teacher', 'private_teacher'] },
+  { href: '/pricing', key: 'pricing', icon: <CreditCard size={ICON} />, roles: ['teacher', 'private_teacher'] },
   { href: '/admin', key: 'admin', icon: <ShieldCheck size={ICON} />, roles: ['admin'] },
-  { href: '/settings', key: 'settings', icon: <Settings size={ICON} />, roles: ['teacher', 'student', 'admin'] },
+  { href: '/settings', key: 'settings', icon: <Settings size={ICON} />, roles: ['teacher', 'private_teacher', 'student', 'admin'] },
 ];
 
 /** A divider is drawn after these items (groups: start / teaching / schedule and site / account). */
