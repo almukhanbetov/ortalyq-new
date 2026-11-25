@@ -1,0 +1,26 @@
+User-agent: *
+Allow: /
+# Вход, регистрация и ссылки с токенами
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /invite/
+Disallow: /student-invite
+# Личный кабинет и классы
+Disallow: /admin
+Disallow: /cabinet
+Disallow: /classes
+Disallow: /materials
+Disallow: /pricing
+Disallow: /schedule
+Disallow: /settings
+Disallow: /students
+Disallow: /welcome
+# Именно /site: правило без «$» закрыло бы и /sitemap.xml
+Disallow: /site$
+Disallow: /site/
+# API
+Disallow: /api/
+
+Sitemap: https://bilimway.kz/sitemap.xml
