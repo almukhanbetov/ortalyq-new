@@ -10,7 +10,7 @@ var Catalog = []CatalogEntry{
 	{Kind: "true_false", Group: "check", Available: false},
 	{Kind: "ordering", Group: "words", Available: false},
 	{Kind: "matching", Group: "words", Available: false},
-	{Kind: "text", Group: "text", Available: false},
+	{Kind: KindText, Group: "text", Available: true},
 	{Kind: "word_set", Group: "words", Available: false},
 	{Kind: "note", Group: "text", Available: false},
 	{Kind: "link", Group: "other", Available: false},
@@ -26,7 +26,7 @@ type KindHandler interface {
 	Sanitize(q Question) Question
 }
 
-var kinds = map[string]KindHandler{KindTest: testKind{}, KindGaps: gapsKind{}}
+var kinds = map[string]KindHandler{KindTest: testKind{}, KindGaps: gapsKind{}, KindText: textKind{}}
 
 func handlerFor(kind string) (KindHandler, bool) {
 	h, ok := kinds[kind]

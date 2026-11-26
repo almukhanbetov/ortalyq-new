@@ -21,7 +21,7 @@ var EnglishA1 = Course{
 	Key:   "english-a1-first-conversations",
 	Title: "English A1 — Первые разговоры",
 	Description: "Авторский разговорный курс для взрослых, которые начинают с нуля. Три урока: поздороваться и назвать имя, " +
-		"рассказать, откуда ты, представить друга. В каждом уроке — диалог и полезные фразы в методичке, " +
+		"рассказать, откуда ты, представить друга. В каждом уроке — диалог, полезные фразы и разговорное задание, " +
 		"тест, три упражнения «Слова и пропуски» и два задания на дом.",
 	CoverColor: "#16C784",
 	Lessons:    []Lesson{lessonHello, lessonFrom, lessonFriend},
@@ -64,8 +64,16 @@ var lessonHello = Lesson{
 			{SecTalk, "Тест «Choose the best reply»: ученик выбирает ответ и сразу читает мини-диалог вслух. Затем разговорное задание."},
 		},
 		Speaking: "Ролевая игра «Первый день в языковой школе». Вы играете нового студента, ученик — себя, потом поменяйтесь. " +
-			"Карточка для ученика: Say hello. Say your name. Ask my name. Ask me to spell my name. Say goodbye. " +
-			"Следите, чтобы ученик говорил полными фразами, и в конце назовите одну фразу, которую стоит повторить.",
+			"Ученик работает по карточке «Speaking task». Следите, чтобы он говорил полными фразами, и в конце назовите одну фразу, которую стоит повторить.",
+		SpeakingCard: []string{
+			"Role play: your first day at a language school. Your teacher is a new student.",
+			"1. Say hello.",
+			"2. Say your name.",
+			"3. Ask your partner's name.",
+			"4. Ask your partner to spell their name.",
+			"5. Say goodbye.",
+			"Then swap roles.",
+		},
 		Homework: "Пропуск «Nice to ___ you» и тест «Choose the correct sentence». Ученик отправляет работу на проверку, " +
 			"вы принимаете её или возвращаете на доработку на вкладке «Домашняя работа».",
 	},
@@ -125,10 +133,19 @@ var lessonFrom = Lesson{
 			{SecPractice, "Пропуски на вопрос Where are you from? Попросите ученика задать вопрос вам и ответить на ваш."},
 			{SecTalk, "Тест «Choose the best reply», затем разговорное задание."},
 		},
-		Speaking: "Игра «Международная конференция». Дайте ученику три карточки с именем, страной и городом " +
-			"(например: Ana — Spain, Madrid; Kenji — Japan, Tokyo; Aigerim — Kazakhstan, Astana). Ученик знакомится с вами " +
-			"от лица каждого героя. Карточка: Say hello and your name. Say where you are from. Ask: Where are you from? " +
-			"Ask: Is it a big city? В конце ученик говорит о себе: «I'm from …».",
+		Speaking: "Игра «Международная конференция». Ученик знакомится с вами от лица каждого героя с карточки «Speaking task», " +
+			"вы отвечаете и задаёте встречные вопросы. В конце ученик говорит о себе: «I'm from …».",
+		SpeakingCard: []string{
+			"Game: an international conference. Be each person and meet your teacher.",
+			"• Ana — Spain, Madrid",
+			"• Kenji — Japan, Tokyo",
+			"• Aigerim — Kazakhstan, Astana",
+			"1. Say hello and your name.",
+			"2. Say where you are from.",
+			"3. Ask: Where are you from?",
+			"4. Ask: Is it a big city?",
+			"At the end, talk about you: I'm from …",
+		},
 		Homework: "Пропуск «Yes, it ___» и тест «Choose the correct answer». Проверьте отправленную работу на вкладке «Домашняя работа».",
 	},
 	Sections: []Section{
@@ -187,9 +204,14 @@ var lessonFriend = Lesson{
 			{SecPractice, "Пропуски на he и she. Спросите, почему в одном случае he, а в другом she."},
 			{SecTalk, "Тест «Choose the best answer», затем разговорное задание."},
 		},
-		Speaking: "«Представь друга». Попросите ученика заранее выбрать друга или родственника (можно фото). " +
-			"Карточка: Say: This is my friend … Say two sentences about him or her: He/She is from … He/She is a … " +
+		Speaking: "«Представь друга». Попросите ученика заранее выбрать друга или родственника (можно фото) и представить его по карточке «Speaking task». " +
 			"Затем вы представляете своего «друга», а ученик реагирует: «Hi, …! Nice to meet you.» и задаёт вопрос «Where are you from?».",
+		SpeakingCard: []string{
+			"Introduce a friend or a family member. You can show a photo.",
+			"1. Say: This is my friend … / This is my sister … / This is my brother …",
+			"2. Say two sentences about him or her: He/She is from … He/She is a …",
+			"Then listen to your teacher's friend. Say: Hi, …! Nice to meet you. Ask: Where are you from?",
+		},
 		Homework: "Пропуск «___ name is Ali» и тест «Choose the correct word». Проверьте работу на вкладке «Домашняя работа».",
 	},
 	Sections: []Section{

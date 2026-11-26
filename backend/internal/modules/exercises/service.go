@@ -140,6 +140,7 @@ func (s *Service) Create(ctx context.Context, p auth.Principal, lessonID uuid.UU
 		}
 	case ScopeHomework:
 		req.SectionID = nil
+		v.Check(req.Kind != KindText, "kind", "Текстовый блок добавляется в раздел урока, а не в домашнюю работу")
 	default:
 		v.Add("scope", "Укажите, куда добавить упражнение")
 	}
@@ -234,6 +235,9 @@ func (s *Service) CopyToHomework(ctx context.Context, p auth.Principal, id uuid.
 	src, err := s.Get(ctx, p, id)
 	if err != nil {
 		return nil, err
+	}
+	if !Gradable(src.Kind) {
+		return nil, apperr.Conflict("text_not_homework", "Текстовый блок нельзя скопировать в домашнюю работу")
 	}
 	v := src.Version
 	req := SaveRequest{Title: v.Title, Settings: v.Settings, Hidden: &src.Hidden}

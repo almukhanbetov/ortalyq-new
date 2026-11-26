@@ -353,7 +353,7 @@ export interface Question {
 }
 
 /** Exercise kinds that work at this stage. */
-export type ExerciseKind = 'test' | 'gaps';
+export type ExerciseKind = 'test' | 'gaps' | 'text';
 
 export interface ExerciseVersion {
   id: string;

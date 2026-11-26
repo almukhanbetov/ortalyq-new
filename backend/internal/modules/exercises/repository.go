@@ -160,16 +160,20 @@ func (r *Repository) LoadVersions(ctx context.Context, ids []uuid.UUID) (map[uui
 		return nil, err
 	}
 	qrows, err := r.pool.Query(ctx, `SELECT q.version_id, q.id, q.prompt, q.multiple, o.id, o.label, o.is_correct
-		FROM exercise_questions q JOIN exercise_options o ON o.question_id = q.id
+		FROM exercise_questions q LEFT JOIN exercise_options o ON o.question_id = q.id
 		WHERE q.version_id = ANY($1) ORDER BY q.version_id, q.position, o.position`, ids)
 	if err != nil {
 		return nil, err
 	}
 	defer qrows.Close()
 	for qrows.Next() {
-		var vid, qid, oid uuid.UUID
-		var prompt, label string
-		var multiple, correct bool
+		// LEFT JOIN: a text block's question has no options (oid, label and correct come back NULL).
+		var vid, qid uuid.UUID
+		var oid *uuid.UUID
+		var label *string
+		var prompt string
+		var multiple bool
+		var correct *bool
 		if err := qrows.Scan(&vid, &qid, &prompt, &multiple, &oid, &label, &correct); err != nil {
 			return nil, err
 		}
@@ -179,8 +183,10 @@ func (r *Repository) LoadVersions(ctx context.Context, ids []uuid.UUID) (map[uui
 			v.Questions = append(v.Questions, Question{ID: qid, Prompt: prompt, Multiple: multiple, Options: []Option{}})
 			n++
 		}
-		c := correct
-		v.Questions[n-1].Options = append(v.Questions[n-1].Options, Option{ID: oid, Label: label, IsCorrect: &c})
+		if oid != nil {
+			c := *correct
+			v.Questions[n-1].Options = append(v.Questions[n-1].Options, Option{ID: *oid, Label: *label, IsCorrect: &c})
+		}
 	}
 	return out, qrows.Err()
 }

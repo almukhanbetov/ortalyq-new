@@ -23,7 +23,7 @@ func (l Lesson) GuideText() string {
 	for _, s := range g.Steps {
 		fmt.Fprintf(&b, "«%s». %s\n", s.Section, s.Text)
 	}
-	fmt.Fprintf(&b, "\nРазговорное задание («%s»): %s\n\nДомашняя работа: %s", SecTalk, g.Speaking, g.Homework)
+	fmt.Fprintf(&b, "\nРазговорное задание («%s»): %s\nКарточка ученика:\n%s\n\nДомашняя работа: %s", SecTalk, g.Speaking, strings.Join(g.SpeakingCard, "\n"), g.Homework)
 	return b.String()
 }
 
@@ -34,9 +34,10 @@ func (c Course) GuideMarkdown() string {
 	fmt.Fprintf(&b, "# %s — методичка преподавателя\n\n", c.Title)
 	b.WriteString("<!-- Generated from backend/internal/content (UPDATE_GUIDE=1 go test ./internal/content). Do not edit by hand. -->\n\n")
 	fmt.Fprintf(&b, "%s\n\n", c.Description)
-	b.WriteString("Курс загружается в «Материалы» командой `api seed-course`. В уроках Bilimway нет текстового блока для ученика, " +
-		"поэтому диалог, фразы и разговорное задание хранятся здесь и в описании урока (поле `description`). " +
-		"Покажите диалог ученику в чате класса или прочитайте его вслух.\n")
+	b.WriteString("Курс загружается в «Материалы» командой `api seed-course`. Диалог и полезные фразы — текстовые блоки " +
+		"раздела «Знакомство с темой», карточка разговорного задания — блок «Speaking task» в «Разговоре»: ученик видит их в классе. " +
+		"Заметки и ключи — блоки «Заметки преподавателя», скрытые от ученика (сервер их ученику не отдаёт). " +
+		"Полная методичка также хранится в описании урока (поле `description`).\n")
 	for i, l := range c.Lessons {
 		g := l.Guide
 		fmt.Fprintf(&b, "\n## Урок %d. %s\n\n**Цель.** %s\n\n**Уровень** %s · **длительность** %d мин\n\n### Диалог\n\n",
@@ -52,7 +53,11 @@ func (c Course) GuideMarkdown() string {
 		for _, s := range g.Steps {
 			fmt.Fprintf(&b, "- **%s.** %s\n", s.Section, s.Text)
 		}
-		fmt.Fprintf(&b, "\n### Разговорное задание\n\n%s\n\n### Упражнения и ключи\n\n", g.Speaking)
+		fmt.Fprintf(&b, "\n### Разговорное задание\n\n%s\n\nКарточка ученика (блок «Speaking task»):\n\n", g.Speaking)
+		for _, x := range g.SpeakingCard {
+			fmt.Fprintf(&b, "> %s  \n", x)
+		}
+		b.WriteString("\n### Упражнения и ключи\n\n")
 		for _, s := range l.Sections {
 			for _, e := range s.Exercises {
 				writeKey(&b, s.Title, e)

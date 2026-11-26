@@ -11,6 +11,7 @@ import { useT } from '@/lib/i18n';
 import { errorMessage } from '@/lib/errors';
 import type { AnswerView, ExerciseView, Question } from '@/types/api';
 import { GapQuestion } from './GapQuestion';
+import { TextBlock } from './TextBlock';
 
 /** Replaces an exercise view in every cached lesson list of this classroom. */
 export function useExerciseCache(classroomId: string) {
@@ -60,7 +61,13 @@ interface Props {
   onChecked?: (correct: boolean) => void;
 }
 
-export function TestPlayer({ classroomId, view, role, studentId, studentName, index, snapshot, preview, onChecked }: Props) {
+/** One exercise of an open lesson: a read-only text block, or a test / gaps exercise the student answers. */
+export function TestPlayer(props: Props) {
+  if (props.view.kind === 'text') return <TextBlock view={props.view} teacher={props.role === 'teacher'} index={props.index} />;
+  return <QuestionPlayer {...props} />;
+}
+
+function QuestionPlayer({ classroomId, view, role, studentId, studentName, index, snapshot, preview, onChecked }: Props) {
   const t = useT();
   const toast = useToast();
   const putClass = useExerciseCache(classroomId);

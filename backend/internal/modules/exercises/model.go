@@ -12,6 +12,7 @@ const (
 	ScopeHomework = "homework"
 	KindTest      = "test"
 	KindGaps      = "gaps" // «Слова и пропуски»: a phrase with one gap and the accepted word
+	KindText      = "text" // «Текст»: a read-only block for reading and speaking, no answer and no grade
 
 	CheckInstant = "instant" // checked while answering
 	CheckAfter   = "after"   // checked after the attempt is finished

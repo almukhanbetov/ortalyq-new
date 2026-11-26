@@ -76,6 +76,60 @@ func TestEnglishA1Rules(t *testing.T) {
 	}
 }
 
+// Text blocks: the dialogue and the phrases open «Знакомство с темой», the speaking card is in «Разговор» (the
+// student sees them); the notes with the keys are teacher-only. Every block fits one text block.
+func TestEnglishA1Blocks(t *testing.T) {
+	cyrillic := regexp.MustCompile(`\p{Cyrillic}`)
+	for _, l := range EnglishA1.Lessons {
+		bs := l.Blocks()
+		byKey := map[string]Block{}
+		for _, b := range bs {
+			byKey[b.Key] = b
+			if n := len([]rune(b.Body)); n == 0 || n > exercises.TextMax {
+				t.Errorf("%s / %s: %d runes", l.Title, b.Key, n)
+			}
+		}
+		d, p, s := byKey["dialogue"], byKey["phrases"], byKey["speaking"]
+		if d.Section != SecIntro || !d.AtTop || d.TeacherOnly || p.Section != SecIntro || !p.AtTop || p.TeacherOnly {
+			t.Errorf("%s: dialogue/phrases placement %+v %+v", l.Title, d, p)
+		}
+		if s.Section != SecTalk || s.TeacherOnly || cyrillic.MatchString(s.Body+d.Body) {
+			t.Errorf("%s: speaking card must be a visible English block in «Разговор»", l.Title)
+		}
+		for _, k := range []string{"notes-intro", "notes-practice", "notes-talk"} {
+			if !byKey[k].TeacherOnly || !strings.Contains(byKey[k].Body, "→") {
+				t.Errorf("%s: %s must be teacher-only and hold keys", l.Title, k)
+			}
+		}
+		// Every answer key of the lesson is in a teacher-only block and in no visible block.
+		for _, e := range append(append([]Exercise{}, l.Homework...), allExercises(l)...) {
+			for _, q := range e.Questions {
+				line := q.Prompt + " → "
+				found := false
+				for _, b := range bs {
+					if strings.Contains(b.Body, line) {
+						if !b.TeacherOnly {
+							t.Errorf("%s: key of %q in a visible block", l.Title, q.Prompt)
+						}
+						found = true
+					}
+				}
+				if !found {
+					t.Errorf("%s: key of %q is missing in the notes", l.Title, q.Prompt)
+				}
+			}
+		}
+	}
+}
+
+func allExercises(l Lesson) []Exercise {
+	var out []Exercise
+	for _, s := range l.Sections {
+		out = append(out, s.Exercises...)
+	}
+	return out
+}
+
 func TestGuideTextFitsDescription(t *testing.T) {
 	for _, l := range EnglishA1.Lessons {
 		g := l.GuideText()

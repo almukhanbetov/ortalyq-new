@@ -54,7 +54,7 @@ func TestContentLoad(t *testing.T) {
 	exByScope := func(lid, scope string) int {
 		return count(`SELECT count(*) FROM exercises WHERE lesson_id = $1 AND scope = $2 AND deleted_at IS NULL`, lid, scope)
 	}
-	if exByScope(l1, "lesson") != 4 || exByScope(l1, "homework") != 2 {
+	if exByScope(l1, "lesson") != 4+6 || exByScope(l1, "homework") != 2 { // 4 exercises + 6 text blocks
 		t.Fatalf("exercises: lesson %d, homework %d", exByScope(l1, "lesson"), exByScope(l1, "homework"))
 	}
 	total := count(`SELECT count(*) FROM exercises`)
@@ -144,7 +144,84 @@ func TestContentLoad(t *testing.T) {
 	teacher.must("PUT", "/api/classrooms/"+str(cls, "id")+"/current-lesson", obj{"lesson_id": l3}, 200, nil)
 	raw := student.must("GET", "/api/classrooms/"+str(cls, "id")+"/lessons/"+l3+"/exercises", nil, 200, nil)
 	if !strings.Contains(string(raw), "This ___ my friend Tom.") || !strings.Contains(string(raw), "Choose the best answer") ||
-		strings.Contains(string(raw), "is_correct") || strings.Contains(string(raw), "correct_answers") {
+		!strings.Contains(string(raw), "Ali: Hi, Sara! This is my friend Tom.") || !strings.Contains(string(raw), "Speaking task") ||
+		strings.Contains(string(raw), "is_correct") || strings.Contains(string(raw), "correct_answers") ||
+		strings.Contains(string(raw), "Заметки преподавателя") || strings.Contains(string(raw), "→") {
 		t.Fatalf("student view: %s", raw)
+	}
+}
+
+// Text blocks reach lessons loaded before blocks existed: they are added once, the dialogue and the phrases at the
+// top of «Знакомство с темой»; the teacher's changes to exercises and to blocks survive every later load.
+func TestContentBlocksForLoadedLessons(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	teacher := e.login("teacher")
+	owner := uuid.MustParse(e.ids["teacher"])
+	r, err := content.Load(ctx, e.pool, owner, content.EnglishA1)
+	if err != nil || r.BlocksAdded != 18 {
+		t.Fatalf("first load: %+v %v", r, err)
+	}
+	// Turn the course into one loaded before text blocks existed.
+	if _, err := e.pool.Exec(ctx, `DELETE FROM exercises WHERE kind = 'text'; DELETE FROM content_imports WHERE key LIKE '%/block/%'`); err != nil {
+		t.Fatal(err)
+	}
+	var course obj
+	teacher.must("GET", "/api/courses/"+r.CourseID.String(), nil, 200, &course)
+	l1 := str(course, "lessons", 0, "id")
+	var list struct {
+		Items []obj `json:"items"`
+	}
+	teacher.must("GET", "/api/lessons/"+l1+"/exercises?scope=lesson", nil, 200, &list)
+	gapID, introID := str(list.Items[0], "id"), str(list.Items[0], "section_id")
+	list.Items = nil // json reuses map elements of a non-empty slice
+	teacher.must("PUT", "/api/exercises/"+gapID, obj{"title": "My intro gap", "settings": obj{"check_mode": "instant"},
+		"questions": []obj{gapQuestion("Hi! My name ___ Dana.", "is")}}, 200, nil)
+
+	r, err = content.Load(ctx, e.pool, owner, content.EnglishA1)
+	if err != nil || r.BlocksAdded != 18 || r.BlocksKept != 0 || len(r.Created) != 0 {
+		t.Fatalf("blocks load: %+v %v", r, err)
+	}
+	list.Items = nil
+	teacher.must("GET", "/api/lessons/"+l1+"/exercises?scope=lesson", nil, 200, &list)
+	intro := []string{}
+	for _, x := range list.Items {
+		if str(x, "section_id") == introID {
+			intro = append(intro, str(x, "version", "title"))
+		}
+	}
+	if strings.Join(intro, " | ") != "Dialogue | Useful phrases | My intro gap | Заметки преподавателя" {
+		t.Fatalf("intro order: %v", intro)
+	}
+	// The teacher edits a block; a repeated load changes nothing.
+	var dialogue obj
+	for _, x := range list.Items {
+		if str(x, "version", "title") == "Dialogue" {
+			dialogue = x
+		}
+	}
+	teacher.must("PUT", "/api/exercises/"+str(dialogue, "id"), obj{"title": "Our dialogue", "settings": obj{"check_mode": "instant"},
+		"questions": []obj{{"prompt": "Dana: Hi!\nTom: Hello!"}}}, 200, nil)
+	before := 0
+	if err := e.pool.QueryRow(ctx, `SELECT count(*) FROM exercises`).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	r, err = content.Load(ctx, e.pool, owner, content.EnglishA1)
+	if err != nil || r.BlocksAdded != 0 || r.BlocksKept != 18 {
+		t.Fatalf("repeated load: %+v %v", r, err)
+	}
+	after := 0
+	if err := e.pool.QueryRow(ctx, `SELECT count(*) FROM exercises`).Scan(&after); err != nil || after != before {
+		t.Fatalf("exercises %d → %d", before, after)
+	}
+	var got obj
+	teacher.must("GET", "/api/exercises/"+str(dialogue, "id"), nil, 200, &got)
+	if str(got, "version", "title") != "Our dialogue" || str(got, "version", "questions", 0, "prompt") != "Dana: Hi!\nTom: Hello!" {
+		t.Fatalf("teacher's block overwritten: %v", got["version"])
+	}
+	got = nil
+	teacher.must("GET", "/api/exercises/"+gapID, nil, 200, &got)
+	if str(got, "version", "title") != "My intro gap" {
+		t.Fatalf("teacher's gap overwritten: %v", got["version"])
 	}
 }

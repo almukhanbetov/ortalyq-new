@@ -34,15 +34,17 @@ type Attrs struct {
 	Functions, Tags                  []string
 }
 
-// Guide is the teacher's methodical note («методичка»). Lessons have no text block a student can see, so the
-// dialogue and the speaking task live here; the loader stores it as the lesson description.
+// Guide is the teacher's methodical note («методичка»). The loader turns it into text blocks of the sections
+// (see Blocks) and also stores it as the lesson description.
 type Guide struct {
 	Goal     string   // RU
 	Dialogue []Line   // EN
 	Phrases  []Phrase // EN + RU
 	Steps    []Step   // RU: what to do in each section
-	Speaking string   // RU instruction + EN task card
-	Homework string   // RU
+	Speaking string   // RU: how the teacher runs the speaking task
+	// SpeakingCard is the student's task card (EN), shown as the «Speaking task» text block of «Разговор».
+	SpeakingCard []string
+	Homework     string // RU
 }
 
 type Line struct{ Speaker, Text string }

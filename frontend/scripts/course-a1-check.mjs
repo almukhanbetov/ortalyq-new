@@ -69,13 +69,14 @@ try {
   const users = await makeUsers(stack, RUN, { students: ['Данияр'] });
   const [SU] = users.students;
   const first = seedCourse(users.teacher.email);
-  assert(first.includes('created for') && (first.match(/\+ Lesson/g) ?? []).length === 3, `first load: ${first}`);
+  assert(first.includes('created for') && (first.match(/\+ Lesson/g) ?? []).length === 3 && first.includes('text blocks: 18 added'), `first load: ${first}`);
   const again = seedCourse(users.teacher.email);
-  assert(again.includes('already in') && (again.match(/kept as is/g) ?? []).length === 3 && !again.includes('+ '), `second load: ${again}`);
+  assert(again.includes('already in') && (again.match(/loaded before, the teacher's version is kept/g) ?? []).length === 3 && !again.includes('+ ')
+    && again.includes('text blocks: 0 added, 18 loaded before'), `second load: ${again}`);
   const api = await apiAs(stack, users.teacher.email, users.teacher.password);
   const courses = await api.must('GET', '/courses', undefined, 200);
   assert(courses.items.filter((c) => c.title === COURSE).length === 1, 'exactly one course after two loads');
-  ok('seed-course: the first load creates the course with 3 lessons, the second one changes nothing');
+  ok('seed-course: the first load creates the course with 3 lessons and 18 text blocks, the second one changes nothing');
 
   // ---- 1. Teacher: «Материалы» → the course → a lesson ----
   const T = await login(users.teacher.email, users.teacher.password);
@@ -91,8 +92,38 @@ try {
   await tp.getByText('Lesson 2. Where are you from?').click();
   for (const s of ['Знакомство с темой', 'Практика', 'Разговор']) await tp.getByText(s, { exact: true }).first().waitFor();
   await tp.getByText('I ___ from Almaty.').waitFor();
+  const rows = tp.locator('li.bg-surface');
+  for (const title of ['Dialogue', 'Useful phrases', 'Speaking task']) await rows.filter({ hasText: title }).first().waitFor();
+  assert((await rows.filter({ hasText: 'Заметки преподавателя' }).count()) === 3, 'three teacher-only notes');
+  assert((await rows.filter({ hasText: 'Заметки преподавателя' }).first().innerText()).includes('Скрыто'), 'notes are hidden from the student');
   await settle(tp);
   await tp.screenshot({ path: `${OUT}/03-lesson-editor.png`, fullPage: true });
+
+  // The teacher adds a text block in «Практика» and edits it (a new version).
+  await tp.getByRole('button', { name: 'Добавить упражнение' }).nth(1).click();
+  await tp.getByRole('dialog', { name: 'Добавить упражнение' }).getByRole('button', { name: 'Текст', exact: true }).click();
+  const ted = tp.getByRole('dialog', { name: 'Новый текстовый блок' });
+  await ted.getByLabel('Заголовок').fill('Pair work');
+  await ted.getByRole('button', { name: 'Сохранить' }).click();
+  await ted.getByText('Обязательное поле').first().waitFor().catch(() => {});
+  await ted.getByRole('textbox', { name: /^Текст/ }).fill('Ask three classmates: Where are you from?');
+  await tp.screenshot({ path: `${OUT}/03a-text-editor.png` });
+  await ted.getByRole('button', { name: 'Сохранить' }).click();
+  await ted.waitFor({ state: 'detached' });
+  await rows.filter({ hasText: 'Pair work' }).getByRole('button', { name: /Pair work/ }).click();
+  const tedit = tp.getByRole('dialog', { name: 'Редактирование текстового блока' });
+  assert((await tedit.getByRole('textbox', { name: /^Текст/ }).inputValue()) === 'Ask three classmates: Where are you from?', 'text prefilled');
+  await tedit.getByRole('textbox', { name: /^Текст/ }).fill('Ask your teacher: Where are you from?\nAnswer: I\'m from …');
+  await tedit.getByRole('button', { name: 'Сохранить' }).click();
+  await tedit.waitFor({ state: 'detached' });
+  await tp.reload();
+  await rows.filter({ hasText: 'Pair work' }).filter({ hasText: 'v2' }).waitFor();
+  await tp.getByRole('tab', { name: 'Домашняя работа' }).click();
+  await tp.getByRole('button', { name: 'Добавить упражнение' }).click();
+  assert(await tp.getByRole('dialog', { name: 'Добавить упражнение' }).getByRole('button', { name: /^Текст/ }).isDisabled(), 'no text in homework');
+  await tp.keyboard.press('Escape');
+  await tp.getByRole('tab', { name: 'Урок' }).click();
+  ok('teacher sees the text blocks (notes hidden), creates a text block in «Практика» and edits it (v2); homework offers no text');
   await tp.getByRole('tab', { name: 'Домашняя работа' }).click();
   await tp.getByText('Homework: answer the question').waitFor();
   await tp.getByText('Homework: choose the correct answer').waitFor();
@@ -106,7 +137,11 @@ try {
   const picker = tp.getByRole('dialog', { name: 'Другой урок' });
   await picker.locator('li').filter({ hasText: 'Lesson 2. Where are you from?' }).getByRole('button', { name: 'Открыть урок' }).click();
   await article(tp, 'Say where you are from').waitFor();
-  await tp.screenshot({ path: `${OUT}/05-teacher-class.png` });
+  await article(tp, 'Dialogue').waitFor();
+  assert((await article(tp, 'Заметки преподавателя').innerText()).includes('Только для преподавателя'), 'teacher sees the notes marked teacher-only');
+  await tp.screenshot({ path: `${OUT}/05-teacher-class.png`, fullPage: true });
+  await article(tp, 'Заметки преподавателя').scrollIntoViewIfNeeded();
+  await tp.screenshot({ path: `${OUT}/05b-teacher-notes.png` });
   ok('teacher opens Lesson 2 in the test class');
 
   // ---- 3. Student: gaps right and wrong ----
@@ -117,6 +152,14 @@ try {
   await sp.goto(`${WEB}/classes/${cls.id}`);
   let g1 = await show(sp, 'Say where you are from');
   await settle(sp);
+  // Text blocks: the dialogue and the phrases open the section; no answer field; the notes never reach the student.
+  const dlg = article(sp, 'Dialogue');
+  assert((await dlg.innerText()).includes('Marco: I\'m from Italy. I\'m from Rome. And you?'), 'dialogue text');
+  assert((await article(sp, 'Useful phrases').innerText()).includes('Where are you from? — Откуда ты?'), 'phrases text');
+  assert((await dlg.getByRole('textbox').count()) === 0 && (await dlg.getByRole('button').count()) === 0, 'no answer field in a text block');
+  assert((await sp.getByText('Заметки преподавателя').count()) === 0, 'no teacher notes on the student page');
+  assert(!bodies.some((x) => x.includes('Заметки преподавателя') || x.includes('→')), 'no notes or keys in student API responses');
+  await sp.screenshot({ path: `${OUT}/05a-student-intro-text.png`, fullPage: true });
   const leaked = bodies.filter((x) => /"is_correct"|"correct_answers"|"correct_option_ids"/.test(x));
   assert(leaked.length === 0, `key before the check: ${leaked[0]?.slice(0, 200)}`);
   await g1.getByRole('textbox', { name: 'Пропуск: впишите слово' }).fill('  AM ');
@@ -138,6 +181,8 @@ try {
 
   // ---- 4. Student: the test right and wrong ----
   const test = await show(sp, 'Choose the best reply');
+  assert((await article(sp, 'Speaking task').innerText()).includes('Game: an international conference.'), 'speaking task in «Разговор»');
+  assert((await sp.getByText('Заметки преподавателя').count()) === 0, 'no notes in «Разговор» for the student');
   const q = (prompt) => test.locator('li').filter({ hasText: prompt });
   await q('— Where are you from?').getByRole('radio', { name: "I'm from Kazakhstan." }).click();
   await q('— Where are you from?').getByText('Верно').waitFor();
@@ -157,7 +202,12 @@ try {
   const test2 = await show(sp, 'Choose the best reply');
   await test2.locator('li').filter({ hasText: '— Where are you from?' }).getByText('Верно').waitFor();
   await test2.locator('li').filter({ hasText: "— I'm from Rome. And you?" }).getByText('Неверно').waitFor();
-  ok('after a reload the gap and test results are the same');
+  await article(sp, 'Speaking task').waitFor();
+  g1 = await show(sp, 'Say where you are from');
+  assert((await article(sp, 'Dialogue').innerText()).includes('Dana: Yes, it is. It\'s beautiful!'), 'dialogue after reload');
+  const pair = await show(sp, 'Pair work');
+  assert((await pair.innerText()).includes("Answer: I'm from …"), 'the edited teacher block reaches the student');
+  ok('after a reload the gap and test results are the same; the text blocks are still shown (incl. the edited one)');
 
   // ---- 6. Homework: student fills and sends, teacher accepts ----
   await sp.getByRole('tab', { name: 'Домашняя работа' }).click();

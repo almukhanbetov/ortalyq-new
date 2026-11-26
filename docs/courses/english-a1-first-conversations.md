@@ -2,9 +2,9 @@
 
 <!-- Generated from backend/internal/content (UPDATE_GUIDE=1 go test ./internal/content). Do not edit by hand. -->
 
-Авторский разговорный курс для взрослых, которые начинают с нуля. Три урока: поздороваться и назвать имя, рассказать, откуда ты, представить друга. В каждом уроке — диалог и полезные фразы в методичке, тест, три упражнения «Слова и пропуски» и два задания на дом.
+Авторский разговорный курс для взрослых, которые начинают с нуля. Три урока: поздороваться и назвать имя, рассказать, откуда ты, представить друга. В каждом уроке — диалог, полезные фразы и разговорное задание, тест, три упражнения «Слова и пропуски» и два задания на дом.
 
-Курс загружается в «Материалы» командой `api seed-course`. В уроках Bilimway нет текстового блока для ученика, поэтому диалог, фразы и разговорное задание хранятся здесь и в описании урока (поле `description`). Покажите диалог ученику в чате класса или прочитайте его вслух.
+Курс загружается в «Материалы» командой `api seed-course`. Диалог и полезные фразы — текстовые блоки раздела «Знакомство с темой», карточка разговорного задания — блок «Speaking task» в «Разговоре»: ученик видит их в классе. Заметки и ключи — блоки «Заметки преподавателя», скрытые от ученика (сервер их ученику не отдаёт). Полная методичка также хранится в описании урока (поле `description`).
 
 ## Урок 1. Hello!
 
@@ -42,7 +42,17 @@
 
 ### Разговорное задание
 
-Ролевая игра «Первый день в языковой школе». Вы играете нового студента, ученик — себя, потом поменяйтесь. Карточка для ученика: Say hello. Say your name. Ask my name. Ask me to spell my name. Say goodbye. Следите, чтобы ученик говорил полными фразами, и в конце назовите одну фразу, которую стоит повторить.
+Ролевая игра «Первый день в языковой школе». Вы играете нового студента, ученик — себя, потом поменяйтесь. Ученик работает по карточке «Speaking task». Следите, чтобы он говорил полными фразами, и в конце назовите одну фразу, которую стоит повторить.
+
+Карточка ученика (блок «Speaking task»):
+
+> Role play: your first day at a language school. Your teacher is a new student.  
+> 1. Say hello.  
+> 2. Say your name.  
+> 3. Ask your partner's name.  
+> 4. Ask your partner to spell their name.  
+> 5. Say goodbye.  
+> Then swap roles.  
 
 ### Упражнения и ключи
 
@@ -97,7 +107,19 @@
 
 ### Разговорное задание
 
-Игра «Международная конференция». Дайте ученику три карточки с именем, страной и городом (например: Ana — Spain, Madrid; Kenji — Japan, Tokyo; Aigerim — Kazakhstan, Astana). Ученик знакомится с вами от лица каждого героя. Карточка: Say hello and your name. Say where you are from. Ask: Where are you from? Ask: Is it a big city? В конце ученик говорит о себе: «I'm from …».
+Игра «Международная конференция». Ученик знакомится с вами от лица каждого героя с карточки «Speaking task», вы отвечаете и задаёте встречные вопросы. В конце ученик говорит о себе: «I'm from …».
+
+Карточка ученика (блок «Speaking task»):
+
+> Game: an international conference. Be each person and meet your teacher.  
+> • Ana — Spain, Madrid  
+> • Kenji — Japan, Tokyo  
+> • Aigerim — Kazakhstan, Astana  
+> 1. Say hello and your name.  
+> 2. Say where you are from.  
+> 3. Ask: Where are you from?  
+> 4. Ask: Is it a big city?  
+> At the end, talk about you: I'm from …  
 
 ### Упражнения и ключи
 
@@ -151,7 +173,14 @@
 
 ### Разговорное задание
 
-«Представь друга». Попросите ученика заранее выбрать друга или родственника (можно фото). Карточка: Say: This is my friend … Say two sentences about him or her: He/She is from … He/She is a … Затем вы представляете своего «друга», а ученик реагирует: «Hi, …! Nice to meet you.» и задаёт вопрос «Where are you from?».
+«Представь друга». Попросите ученика заранее выбрать друга или родственника (можно фото) и представить его по карточке «Speaking task». Затем вы представляете своего «друга», а ученик реагирует: «Hi, …! Nice to meet you.» и задаёт вопрос «Where are you from?».
+
+Карточка ученика (блок «Speaking task»):
+
+> Introduce a friend or a family member. You can show a photo.  
+> 1. Say: This is my friend … / This is my sister … / This is my brother …  
+> 2. Say two sentences about him or her: He/She is from … He/She is a …  
+> Then listen to your teacher's friend. Say: Hi, …! Nice to meet you. Ask: Where are you from?  
 
 ### Упражнения и ключи
 

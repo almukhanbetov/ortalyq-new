@@ -24,6 +24,9 @@ type Result struct {
 	Created       []string // lesson titles added now
 	Kept          []string // lessons loaded before and left as the teacher has them
 	Deleted       []string // lessons loaded before and deleted by the teacher; not restored
+	BlocksAdded   int      // text blocks added now (to new lessons and to lessons loaded before)
+	BlocksKept    int      // text blocks loaded before: left as the teacher has them, or deleted by the teacher
+	BlocksSkipped []string // blocks whose section the teacher renamed or deleted: not added
 }
 
 // Validate checks the course the way the editor checks a saved exercise, plus the authoring rules of this
@@ -63,6 +66,24 @@ func Validate(c Course) error {
 		}
 		for _, e := range l.Homework {
 			check(l.Title+" / homework / "+e.Title, e)
+		}
+		blockKeys := map[string]bool{}
+		for _, b := range l.Blocks() {
+			where := l.Title + " / " + b.Section + " / " + b.Title
+			if blockKeys[b.Key] {
+				add(where, "block key must be unique")
+			}
+			blockKeys[b.Key] = true
+			found := false
+			for _, s := range l.Sections {
+				found = found || s.Title == b.Section
+			}
+			if !found {
+				add(where, "no such section")
+			}
+			for f, m := range exercises.CheckContent(exercises.KindText, b.Request()) {
+				add(where, f+" "+m)
+			}
 		}
 	}
 	if len(errs) > 0 {
@@ -121,20 +142,23 @@ func Load(ctx context.Context, pool *pgxpool.Pool, ownerID uuid.UUID, c Course) 
 				if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM lessons WHERE id = $1)`, lessonID).Scan(&exists); err != nil {
 					return err
 				}
-				if exists {
-					res.Kept = append(res.Kept, l.Title)
-				} else {
+				if !exists {
 					res.Deleted = append(res.Deleted, l.Title)
+					continue
 				}
-				continue
+				res.Kept = append(res.Kept, l.Title)
+			} else {
+				if lessonID, err = createLesson(ctx, tx, ownerID, courseID, l); err != nil {
+					return fmt.Errorf("%s: %w", l.Title, err)
+				}
+				if err := remember(ctx, tx, ownerID, key, lessonID); err != nil {
+					return err
+				}
+				res.Created = append(res.Created, l.Title)
 			}
-			if lessonID, err = createLesson(ctx, tx, ownerID, courseID, l); err != nil {
+			if err := addBlocks(ctx, tx, ownerID, lessonID, key, l, res); err != nil {
 				return fmt.Errorf("%s: %w", l.Title, err)
 			}
-			if err := remember(ctx, tx, ownerID, key, lessonID); err != nil {
-				return err
-			}
-			res.Created = append(res.Created, l.Title)
 		}
 		return nil
 	})
@@ -193,4 +217,93 @@ func nonNil(s []string) []string {
 		return []string{}
 	}
 	return s
+}
+
+// addBlocks adds the lesson's text blocks that were never loaded for this teacher. A loaded block is never touched
+// again (the teacher may edit or delete it). Blocks «at the top» go before the section's exercises: the items of
+// the section move down by the number of new blocks, nothing else of the teacher's changes.
+func addBlocks(ctx context.Context, tx pgx.Tx, owner, lessonID uuid.UUID, lessonKey string, l Lesson, res *Result) error {
+	rows, err := tx.Query(ctx, `SELECT id, title FROM sections WHERE lesson_id = $1 ORDER BY position, created_at`, lessonID)
+	if err != nil {
+		return err
+	}
+	sections := map[string]uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		var title string
+		if err := rows.Scan(&id, &title); err != nil {
+			rows.Close()
+			return err
+		}
+		if _, dup := sections[title]; !dup {
+			sections[title] = id
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	type missing struct {
+		b   Block
+		key string
+	}
+	top := map[uuid.UUID][]missing{}
+	var order []uuid.UUID
+	var bottom []missing
+	bottomSection := map[string]uuid.UUID{}
+	for _, b := range l.Blocks() {
+		key := lessonKey + "/block/" + b.Key
+		if _, seen, err := imported(ctx, tx, owner, key); err != nil {
+			return err
+		} else if seen {
+			res.BlocksKept++
+			continue
+		}
+		sid, ok := sections[b.Section]
+		if !ok {
+			res.BlocksSkipped = append(res.BlocksSkipped, l.Title+" / "+b.Section+" / "+b.Title)
+			continue
+		}
+		if b.AtTop {
+			if _, ok := top[sid]; !ok {
+				order = append(order, sid)
+			}
+			top[sid] = append(top[sid], missing{b, key})
+		} else {
+			bottom = append(bottom, missing{b, key})
+			bottomSection[key] = sid
+		}
+	}
+	create := func(sid uuid.UUID, m missing) (uuid.UUID, error) {
+		id, err := exercises.CreateTx(ctx, tx, lessonID, exercises.ScopeLesson, &sid, exercises.KindText, owner, nil, m.b.Request())
+		if err != nil {
+			return uuid.Nil, err
+		}
+		if err := remember(ctx, tx, owner, m.key, id); err != nil {
+			return uuid.Nil, err
+		}
+		res.BlocksAdded++
+		return id, nil
+	}
+	for _, sid := range order {
+		list := top[sid]
+		if _, err := tx.Exec(ctx, `UPDATE exercises SET position = position + $2 WHERE section_id = $1 AND deleted_at IS NULL`, sid, len(list)); err != nil {
+			return err
+		}
+		for i, m := range list {
+			id, err := create(sid, m)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `UPDATE exercises SET position = $2 WHERE id = $1`, id, i); err != nil {
+				return err
+			}
+		}
+	}
+	for _, m := range bottom {
+		if _, err := create(bottomSection[m.key], m); err != nil {
+			return err
+		}
+	}
+	return nil
 }

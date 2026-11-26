@@ -190,10 +190,14 @@ func loadCourse(ctx context.Context, pool *pgxpool.Pool, email string) error {
 			fmt.Printf("  + %s\n", t)
 		}
 		for _, t := range r.Kept {
-			fmt.Printf("  = %s (kept as is)\n", t)
+			fmt.Printf("  = %s (loaded before, the teacher's version is kept)\n", t)
 		}
 		for _, t := range r.Deleted {
 			fmt.Printf("  - %s (deleted by the teacher, not restored)\n", t)
+		}
+		fmt.Printf("  text blocks: %d added, %d loaded before (left as is)\n", r.BlocksAdded, r.BlocksKept)
+		for _, b := range r.BlocksSkipped {
+			fmt.Printf("  ! %s: the section is renamed or deleted, block not added\n", b)
 		}
 	}
 	return nil

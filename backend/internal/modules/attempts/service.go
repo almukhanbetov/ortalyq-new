@@ -92,6 +92,11 @@ func lockedErr(scope string) error {
 	return ErrLessonLocked()
 }
 
+// errReadOnly: a text block is read, not answered.
+func errReadOnly() error {
+	return apperr.Conflict("exercise_read_only", "Текстовый блок не требует ответа")
+}
+
 func homeworkLocked(status string) bool { return status == "pending" || status == "done" }
 
 func strp(s string) *string { return &s }
@@ -373,6 +378,9 @@ func (s *Service) Start(ctx context.Context, p auth.Principal, classroomID, exer
 	}
 	if role != classrooms.MemberStudent {
 		return nil, apperr.New(403, "teacher_cannot_answer", "Преподаватель не выполняет упражнения за ученика")
+	}
+	if !exercises.Gradable(e.Kind) {
+		return nil, errReadOnly()
 	}
 	existing, err := s.repo.Live(ctx, s.repo.Pool(), classroomID, exerciseID, p.UserID)
 	if err != nil && !database.IsNoRows(err) {
@@ -670,6 +678,7 @@ func (s *Service) scopeAttempts(ctx context.Context, q database.Querier, classro
 	if err != nil {
 		return nil, nil, err
 	}
+	list = exercises.OnlyGradable(list)
 	ids := make([]uuid.UUID, len(list))
 	for i, e := range list {
 		ids[i] = e.ID
@@ -854,7 +863,7 @@ func (s *Service) PointsFor(ctx context.Context, classroomID uuid.UUID, lessonID
 		if err != nil {
 			return nil, err
 		}
-		list = append(list, l...)
+		list = append(list, exercises.OnlyGradable(l)...)
 	}
 	if len(list) == 0 || len(studentIDs) == 0 {
 		return out, nil
@@ -1076,6 +1085,9 @@ func (s *Service) PreviewStart(ctx context.Context, p auth.Principal, exerciseID
 	e, err := s.previewExercise(ctx, p, exerciseID)
 	if err != nil {
 		return nil, err
+	}
+	if !exercises.Gradable(e.Kind) {
+		return nil, errReadOnly()
 	}
 	vs, err := s.ex.Versions(ctx, []uuid.UUID{e.VersionID})
 	if err != nil {

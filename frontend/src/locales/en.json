@@ -240,7 +240,7 @@
   },
   "catalog": {
     "title": "Add exercise",
-    "hint": "At this stage «Test» and «Words and gaps» (one gap per phrase) work. Other types are listed for completeness and are not available yet.",
+    "hint": "At this stage «Test», «Words and gaps» (one gap per phrase) and «Text» — a block for reading and speaking practice with no answer and no grade — work. Other types are listed for completeness and are not available yet.",
     "unavailable": "Unavailable",
     "groups": {
       "media": "Media",
@@ -257,7 +257,7 @@
       "true_false": "True / false",
       "ordering": "Word and text order",
       "matching": "Matching",
-      "text": "Text work",
+      "text": "Text",
       "word_set": "Word set",
       "note": "Note",
       "link": "Link",
@@ -331,7 +331,16 @@
     "gapAnswerPlaceholder": "am",
     "gapPreview": "What the student sees",
     "gapNoMarker": "Mark the gap: ___",
-    "gapManyMarkers": "Only one gap per phrase is supported for now"
+    "gapManyMarkers": "Only one gap per phrase is supported for now",
+    "titleNewText": "New text block",
+    "titleEditText": "Edit text block",
+    "textTitlePlaceholder": "For example: Dialogue",
+    "textBody": "Text",
+    "textBodyHint": "Line breaks are kept. A line like «Name: line» is shown as a dialogue line. There is no answer field and no grade.",
+    "textBodyPlaceholder": "Aruzhan: Hello! I'm Aruzhan.\nBen: Hi, Aruzhan! My name is Ben.",
+    "textTooLong": "At most {n} characters",
+    "textHidden": "Teacher only",
+    "textHiddenHint": "The student does not receive this block: use it for notes and answer keys"
   },
   "test": {
     "startTitle": "Timed test",
@@ -1139,6 +1148,9 @@
     "usedTitle": "The invitation is already accepted",
     "usedText": "The invitation from this link has already been accepted. Sign in to your account.",
     "login": "Sign in"
+  },
+  "text": {
+    "teacherOnly": "Teacher only"
   },
   "boards": {
     "tab": "Interactive boards",
