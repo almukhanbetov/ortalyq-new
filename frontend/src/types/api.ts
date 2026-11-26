@@ -356,6 +356,16 @@ export interface Question {
 export type ExerciseKind = 'test' | 'gaps' | 'text' | 'pdf';
 
 /** The PDF of a «PDF-документ» block. It is opened only through its exercise (see exercisesApi.fileUrl / attemptsApi.fileUrl). */
+/** A PDF document in «Личные материалы»: a personal material of the teacher who uploaded it. */
+export interface MaterialDocument {
+  id: string;
+  title: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: string;
+}
+
 export interface LessonFile {
   id: string;
   name: string;

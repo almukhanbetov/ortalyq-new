@@ -248,7 +248,11 @@
     "catalogAlready": "The course is already in «Personal materials»",
     "catalogAddHint": "You get your own copy: you can change it, the catalog original stays as is. Teacher notes and keys stay hidden from students.",
     "catalogOwnedHint": "The course is already in «Personal materials». Adding it again does not create a second copy.",
-    "catalogLessonMeta": "{level} · {min} min · texts: {texts} · exercises: {ex} · homework: {hw}"
+    "catalogLessonMeta": "{level} · {min} min · texts: {texts} · exercises: {ex} · homework: {hw}",
+    "pdfBadge": "PDF",
+    "documentNotFound": "Document not found",
+    "documentNotFoundHint": "The link may be wrong or the document belongs to another teacher.",
+    "uploadedAt": "Uploaded {date}"
   },
   "catalog": {
     "title": "Add exercise",

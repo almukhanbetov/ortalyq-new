@@ -16,6 +16,7 @@ import (
 	"ortalyq/backend/internal/modules/boards"
 	"ortalyq/backend/internal/modules/chat"
 	"ortalyq/backend/internal/modules/classrooms"
+	"ortalyq/backend/internal/modules/documents"
 	"ortalyq/backend/internal/modules/exercises"
 	"ortalyq/backend/internal/modules/grading"
 	"ortalyq/backend/internal/modules/homework"
@@ -107,6 +108,7 @@ func New(cfg config.Config, pool *pgxpool.Pool) (*App, error) {
 	homework.NewHandler(hwSvc).Register(authed)
 	grading.NewHandler(gradeSvc).Register(authed)
 	uploads.NewHandler(upSvc).Register(authed)
+	documents.NewHandler(documents.NewService(documents.NewRepository(pool), upSvc), cfg.AllowedOrigins).Register(authed)
 	chat.NewHandler(chatSvc).Register(authed)
 	marSvc := marathons.NewService(marRepo, classSvc, matSvc, matSvc, attSvc, usersSvc, hub)
 	classSvc.SetMarathonGate(marSvc)

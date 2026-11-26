@@ -78,6 +78,11 @@ export function materialUrl(id: string) {
   return `${MATERIALS_ROUTE}/courses/${id}`;
 }
 
+/** A PDF document of «Личные материалы» (the viewer). */
+export function documentUrl(id: string) {
+  return `${MATERIALS_ROUTE}/documents/${id}`;
+}
+
 /** Lesson editor in materials. With a marathon id the editor offers "back to the marathon" instead of the course. */
 export function lessonEditorUrl(lessonId: string, marathonId?: string) {
   const base = `/materials/lessons/${lessonId}`;

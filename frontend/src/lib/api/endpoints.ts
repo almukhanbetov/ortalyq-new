@@ -9,7 +9,7 @@ import type {
   CatalogCourse,
   StudentInviteAccepted, StudentInviteLink, StudentInviteSent,
   Appearance, AppearanceRequest, EffectiveAppearance, ImageSlot, MarathonAppearance,
-  Assignment, Attachment, CatalogEntry, Category, ChatMessage, Classroom, Course, Exercise, ExerciseStats, ExerciseView, LessonFile,
+  Assignment, Attachment, CatalogEntry, Category, ChatMessage, Classroom, Course, Exercise, ExerciseStats, ExerciseView, LessonFile, MaterialDocument,
   FilterOptions, Gif, Grade, InvitationInfo, InviteResult, MarathonInvitation, HomeworkStatus, HomeworkView, Lesson, LessonAttrs, LessonFilter, ListResponse, MarathonLessonCopied, MarathonLessonFields, MarathonLessonReview, MarathonLessons, MarathonMe, MarathonMode, MarathonPassage, MarathonLessonComment, MarathonLessonResults, MarathonMyResults, MarathonReviewRequest, MarathonStudentsRating, MarathonSaveRequest, MarathonStats, MarathonStatsSettings, MarathonUnlockAfter, MarathonStudent, MarathonStudentProgress, Me, Progress,
   SaveExerciseRequest, Scope, Section, SignupLink, SignupRequested, User,
 } from '@/types/api';
@@ -153,6 +153,14 @@ export const libraryApi = {
   list: (q: string) => api.get<{ items: CatalogCourse[]; total: number }>('/material-catalog', { q }),
   get: (key: string) => api.get<CatalogCourse>(`/material-catalog/${encodeURIComponent(key)}`),
   add: (key: string) => api.post<{ course_id: string; created: boolean }>(`/material-catalog/${encodeURIComponent(key)}/add`),
+};
+
+/** «Личные материалы» → PDF documents of the teacher (only the owner lists and opens them). */
+export const documentsApi = {
+  list: (q: string) => api.get<ListResponse<MaterialDocument>>('/documents', { q, limit: 100 }),
+  get: (id: string) => api.get<MaterialDocument>(`/documents/${id}`),
+  /** The PDF for the browser's viewer; the API checks the owner on every request (also for a link opened directly). */
+  fileUrl: (id: string) => `${API_URL}/api/documents/${id}/file`,
 };
 
 export const materialsApi = {
