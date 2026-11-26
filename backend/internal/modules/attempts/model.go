@@ -40,6 +40,7 @@ type Attempt struct {
 type Answer struct {
 	QuestionID uuid.UUID
 	Selected   []uuid.UUID
+	Text       string // the typed word of a gap exercise
 	Checked    bool
 	UpdatedAt  time.Time
 }
@@ -57,7 +58,6 @@ type Summary struct {
 // Grade computes the summary of answers against a version. Pure and deterministic,
 // so recomputation never double-counts points.
 func Grade(v *exercises.Version, answers map[uuid.UUID]Answer, onlyChecked bool) Summary {
-	key := v.CorrectSet()
 	var s Summary
 	for _, q := range v.Questions {
 		a, ok := answers[q.ID]
@@ -65,7 +65,7 @@ func Grade(v *exercises.Version, answers map[uuid.UUID]Answer, onlyChecked bool)
 			s.Unanswered++
 			continue
 		}
-		switch exercises.GradeQuestion(key[q.ID], a.Selected) {
+		switch v.Grade(q, a.Response()) {
 		case exercises.Correct:
 			s.Correct++
 		case exercises.Wrong:
@@ -79,4 +79,9 @@ func Grade(v *exercises.Version, answers map[uuid.UUID]Answer, onlyChecked bool)
 		s.PointsEarned = s.Correct * v.Settings.PointsPerCorrect
 	}
 	return s
+}
+
+// Response is the answer in the form the exercise kinds grade.
+func (a Answer) Response() exercises.Response {
+	return exercises.Response{Selected: a.Selected, Text: a.Text}
 }

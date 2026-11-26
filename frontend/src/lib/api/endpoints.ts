@@ -1,6 +1,12 @@
 // Typed endpoint functions grouped by domain.
-import { api, request } from './client';
+import { API_URL, api, request } from './client';
 import type {
+  Board,
+  ClassBoardView,
+  BoardImage,
+  BoardItem,
+  BoardSummary,
+  CatalogCourse,
   StudentInviteAccepted, StudentInviteLink, StudentInviteSent,
   Appearance, AppearanceRequest, EffectiveAppearance, ImageSlot, MarathonAppearance,
   Assignment, Attachment, CatalogEntry, Category, ChatMessage, Classroom, Course, Exercise, ExerciseStats, ExerciseView,
@@ -110,6 +116,45 @@ export const marathonsApi = {
   removeStudent: (id: string, sid: string) => api.del<{ items: MarathonStudent[] }>(`/marathons/${id}/students/${sid}`),
 };
 
+/** «Материалы» → «Интерактивные доски». */
+export const boardsApi = {
+  list: (q: string) => api.get<ListResponse<BoardSummary>>('/boards', { q, limit: 100 }),
+  create: (title: string) => api.post<Board>('/boards', { title }),
+  get: (id: string) => api.get<Board>(`/boards/${id}`),
+  save: (id: string, body: { content: { items: BoardItem[] }; version: number; force?: boolean; title?: string }) => api.put<Board>(`/boards/${id}`, body),
+  uploadImage: (id: string, file: File) => {
+    const f = new FormData();
+    f.append('file', file);
+    return api.upload<BoardImage>(`/boards/${id}/images`, f);
+  },
+  /** A picture of the board; served only to the board's owner (the browser sends the session cookie). */
+  imageUrl: (id: string, imageId: string) => `${API_URL}/api/boards/${id}/images/${imageId}`,
+};
+
+/** The board open in a class lesson: members read it, the teacher of the class opens and closes it. */
+export const classBoardApi = {
+  get: (cid: string) => api.get<ClassBoardView>(`/classrooms/${cid}/board`),
+  open: (cid: string, boardId: string) => api.put<ClassBoardView>(`/classrooms/${cid}/board`, { board_id: boardId }),
+  /** «Создать копию для занятия»: a copy of the board is made and opened; the same requestId twice makes one copy. */
+  openCopy: (cid: string, boardId: string, requestId: string) =>
+    api.put<ClassBoardView>(`/classrooms/${cid}/board`, { board_id: boardId, copy: true, request_id: requestId }),
+  close: (cid: string) => request<void>('DELETE', `/classrooms/${cid}/board`),
+  allowDrawing: (cid: string, userId: string) => api.put<ClassBoardView>(`/classrooms/${cid}/board/drawers/${userId}`),
+  revokeDrawing: (cid: string, userId: string) => request<ClassBoardView>('DELETE', `/classrooms/${cid}/board/drawers/${userId}`),
+  /** A student's pen stroke, added as its own action; the same client_id sent again is stored once. */
+  stroke: (cid: string, body: { board_id: string; client_id: string; color: string; width: number; points: [number, number][] }) =>
+    api.post<{ item_id: string; version: number; duplicate: boolean }>(`/classrooms/${cid}/board/strokes`, body),
+  /** A picture of the open board, served to members of the class only. */
+  imageUrl: (cid: string, imageId: string) => `${API_URL}/api/classrooms/${cid}/board/images/${imageId}`,
+};
+
+/** «Материалы» → «Каталог». */
+export const libraryApi = {
+  list: (q: string) => api.get<{ items: CatalogCourse[]; total: number }>('/material-catalog', { q }),
+  get: (key: string) => api.get<CatalogCourse>(`/material-catalog/${encodeURIComponent(key)}`),
+  add: (key: string) => api.post<{ course_id: string; created: boolean }>(`/material-catalog/${encodeURIComponent(key)}/add`),
+};
+
 export const materialsApi = {
   courses: (f: LessonFilter & { limit?: number; offset?: number }) => api.get<ListResponse<Course>>('/courses', { ...f }),
   course: (id: string, f: LessonFilter = {}) => api.get<Course>(`/courses/${id}`, { ...f }),
@@ -148,8 +193,9 @@ export const attemptsApi = {
   view: (cid: string, eid: string, studentId?: string) => api.get<ExerciseView>(`/classrooms/${cid}/exercises/${eid}`, { student_id: studentId }),
   start: (cid: string, eid: string) => api.post<ExerciseView>(`/classrooms/${cid}/exercises/${eid}/attempt`),
   reset: (cid: string, eid: string, studentId: string) => api.post<ExerciseView>(`/classrooms/${cid}/exercises/${eid}/reset`, { student_id: studentId }),
-  answer: (attemptId: string, questionId: string, optionIds: string[], check: boolean) =>
-    api.put<ExerciseView>(`/attempts/${attemptId}/answers/${questionId}`, { option_ids: optionIds, check }),
+  /** A test answer sends option ids; a gap answer sends the typed word in `text`. */
+  answer: (attemptId: string, questionId: string, optionIds: string[], check: boolean, text = '') =>
+    api.put<ExerciseView>(`/attempts/${attemptId}/answers/${questionId}`, { option_ids: optionIds, text, check }),
   finish: (attemptId: string) => api.post<ExerciseView>(`/attempts/${attemptId}/finish`),
 };
 
@@ -159,8 +205,9 @@ export const previewApi = {
   resetLesson: (lid: string) => api.post<{ items: ExerciseView[] }>(`/preview/lessons/${lid}/reset`),
   view: (eid: string) => api.get<ExerciseView>(`/preview/exercises/${eid}`),
   start: (eid: string) => api.post<ExerciseView>(`/preview/exercises/${eid}/attempt`),
-  answer: (attemptId: string, questionId: string, optionIds: string[], check: boolean) =>
-    api.put<ExerciseView>(`/preview/attempts/${attemptId}/answers/${questionId}`, { option_ids: optionIds, check }),
+  /** A test answer sends option ids; a gap answer sends the typed word in `text`. */
+  answer: (attemptId: string, questionId: string, optionIds: string[], check: boolean, text = '') =>
+    api.put<ExerciseView>(`/preview/attempts/${attemptId}/answers/${questionId}`, { option_ids: optionIds, text, check }),
   finish: (attemptId: string) => api.post<ExerciseView>(`/preview/attempts/${attemptId}/finish`),
   reset: (attemptId: string) => api.post<ExerciseView>(`/preview/attempts/${attemptId}/reset`),
 };

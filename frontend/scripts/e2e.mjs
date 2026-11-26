@@ -33,7 +33,7 @@ const expectVisible = async (loc, what) => {
 async function login(p, email, pw) {
   await p.goto(`${WEB}/login`);
   await p.getByLabel('Email').fill(email);
-  await p.getByLabel('Пароль').fill(pw);
+  await p.getByLabel('Пароль', { exact: true }).fill(pw);
   await p.getByRole('button', { name: 'Войти' }).click();
   await p.waitForURL(/\/classes/);
 }

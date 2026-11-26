@@ -48,17 +48,25 @@ func insertVersion(ctx context.Context, tx pgx.Tx, exerciseID uuid.UUID, by uuid
 
 func (r *Repository) Create(ctx context.Context, lessonID uuid.UUID, scope string, sectionID *uuid.UUID, kind string, by uuid.UUID, copiedFrom *uuid.UUID, req SaveRequest) (uuid.UUID, error) {
 	var id uuid.UUID
-	hidden := req.Hidden != nil && *req.Hidden
-	err := database.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
-		if err := tx.QueryRow(ctx, `INSERT INTO exercises (lesson_id, scope, section_id, kind, hidden, created_by, copied_from_id, position)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT COALESCE(max(position), -1) + 1 FROM exercises
-			  WHERE lesson_id = $1 AND scope = $2 AND section_id IS NOT DISTINCT FROM $3 AND deleted_at IS NULL)) RETURNING id`,
-			lessonID, scope, sectionID, kind, hidden, by, copiedFrom).Scan(&id); err != nil {
-			return err
-		}
-		_, err := insertVersion(ctx, tx, id, by, req)
+	err := database.WithTx(ctx, r.pool, func(tx pgx.Tx) (err error) {
+		id, err = CreateTx(ctx, tx, lessonID, scope, sectionID, kind, by, copiedFrom, req)
 		return err
 	})
+	return id, err
+}
+
+// CreateTx inserts an exercise with its first version inside the caller's transaction
+// (the editor via Create, the course loader in internal/content). The request must be validated already.
+func CreateTx(ctx context.Context, tx pgx.Tx, lessonID uuid.UUID, scope string, sectionID *uuid.UUID, kind string, by uuid.UUID, copiedFrom *uuid.UUID, req SaveRequest) (uuid.UUID, error) {
+	var id uuid.UUID
+	hidden := req.Hidden != nil && *req.Hidden
+	if err := tx.QueryRow(ctx, `INSERT INTO exercises (lesson_id, scope, section_id, kind, hidden, created_by, copied_from_id, position)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT COALESCE(max(position), -1) + 1 FROM exercises
+		  WHERE lesson_id = $1 AND scope = $2 AND section_id IS NOT DISTINCT FROM $3 AND deleted_at IS NULL)) RETURNING id`,
+		lessonID, scope, sectionID, kind, hidden, by, copiedFrom).Scan(&id); err != nil {
+		return uuid.Nil, err
+	}
+	_, err := insertVersion(ctx, tx, id, by, req)
 	return id, err
 }
 
@@ -129,16 +137,17 @@ func (r *Repository) LoadVersions(ctx context.Context, ids []uuid.UUID) (map[uui
 	if len(ids) == 0 {
 		return out, nil
 	}
-	rows, err := r.pool.Query(ctx, `SELECT v.id, v.exercise_id, v.version, v.title, v.check_mode, v.timer_enabled, v.timer_seconds,
+	rows, err := r.pool.Query(ctx, `SELECT v.id, v.exercise_id, e.kind, v.version, v.title, v.check_mode, v.timer_enabled, v.timer_seconds,
 		v.scoring_enabled, v.points_per_correct, v.category_id, COALESCE(c.name, ''), v.created_at
-		FROM exercise_versions v LEFT JOIN score_categories c ON c.id = v.category_id WHERE v.id = ANY($1)`, ids)
+		FROM exercise_versions v JOIN exercises e ON e.id = v.exercise_id
+		LEFT JOIN score_categories c ON c.id = v.category_id WHERE v.id = ANY($1)`, ids)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		var v Version
 		s := &v.Settings
-		if err := rows.Scan(&v.ID, &v.ExerciseID, &v.Number, &v.Title, &s.CheckMode, &s.TimerEnabled, &s.TimerSeconds,
+		if err := rows.Scan(&v.ID, &v.ExerciseID, &v.Kind, &v.Number, &v.Title, &s.CheckMode, &s.TimerEnabled, &s.TimerSeconds,
 			&s.ScoringEnabled, &s.PointsPerCorrect, &s.CategoryID, &s.CategoryName, &v.CreatedAt); err != nil {
 			rows.Close()
 			return nil, err
@@ -151,16 +160,20 @@ func (r *Repository) LoadVersions(ctx context.Context, ids []uuid.UUID) (map[uui
 		return nil, err
 	}
 	qrows, err := r.pool.Query(ctx, `SELECT q.version_id, q.id, q.prompt, q.multiple, o.id, o.label, o.is_correct
-		FROM exercise_questions q JOIN exercise_options o ON o.question_id = q.id
+		FROM exercise_questions q LEFT JOIN exercise_options o ON o.question_id = q.id
 		WHERE q.version_id = ANY($1) ORDER BY q.version_id, q.position, o.position`, ids)
 	if err != nil {
 		return nil, err
 	}
 	defer qrows.Close()
 	for qrows.Next() {
-		var vid, qid, oid uuid.UUID
-		var prompt, label string
-		var multiple, correct bool
+		// LEFT JOIN: a text block's question has no options (oid, label and correct come back NULL).
+		var vid, qid uuid.UUID
+		var oid *uuid.UUID
+		var label *string
+		var prompt string
+		var multiple bool
+		var correct *bool
 		if err := qrows.Scan(&vid, &qid, &prompt, &multiple, &oid, &label, &correct); err != nil {
 			return nil, err
 		}
@@ -170,8 +183,10 @@ func (r *Repository) LoadVersions(ctx context.Context, ids []uuid.UUID) (map[uui
 			v.Questions = append(v.Questions, Question{ID: qid, Prompt: prompt, Multiple: multiple, Options: []Option{}})
 			n++
 		}
-		c := correct
-		v.Questions[n-1].Options = append(v.Questions[n-1].Options, Option{ID: oid, Label: label, IsCorrect: &c})
+		if oid != nil {
+			c := *correct
+			v.Questions[n-1].Options = append(v.Questions[n-1].Options, Option{ID: *oid, Label: *label, IsCorrect: &c})
+		}
 	}
 	return out, qrows.Err()
 }
@@ -231,25 +246,25 @@ func (r *Repository) CreateCategory(ctx context.Context, owner uuid.UUID, name, 
 }
 
 // QuestionStats aggregates live (non-reset) attempts of a given version.
-func (r *Repository) QuestionStats(ctx context.Context, versionID uuid.UUID) (attempts, finished int, answers map[uuid.UUID][][]uuid.UUID, err error) {
+func (r *Repository) QuestionStats(ctx context.Context, versionID uuid.UUID) (attempts, finished int, answers map[uuid.UUID][]Response, err error) {
 	if err = r.pool.QueryRow(ctx, `SELECT count(*), count(*) FILTER (WHERE status = 'finished') FROM attempts WHERE version_id = $1 AND status <> 'reset'`,
 		versionID).Scan(&attempts, &finished); err != nil {
 		return
 	}
-	rows, err := r.pool.Query(ctx, `SELECT aa.question_id, aa.selected_option_ids FROM attempt_answers aa
+	rows, err := r.pool.Query(ctx, `SELECT aa.question_id, aa.selected_option_ids, aa.answer_text FROM attempt_answers aa
 		JOIN attempts a ON a.id = aa.attempt_id WHERE a.version_id = $1 AND a.status <> 'reset'`, versionID)
 	if err != nil {
 		return
 	}
 	defer rows.Close()
-	answers = map[uuid.UUID][][]uuid.UUID{}
+	answers = map[uuid.UUID][]Response{}
 	for rows.Next() {
 		var q uuid.UUID
-		var sel []uuid.UUID
-		if err = rows.Scan(&q, &sel); err != nil {
+		var resp Response
+		if err = rows.Scan(&q, &resp.Selected, &resp.Text); err != nil {
 			return
 		}
-		answers[q] = append(answers[q], sel)
+		answers[q] = append(answers[q], resp)
 	}
 	err = rows.Err()
 	return

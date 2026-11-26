@@ -2,7 +2,9 @@ package attempts
 
 import (
 	"context"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -90,6 +92,11 @@ func lockedErr(scope string) error {
 	return ErrLessonLocked()
 }
 
+// errReadOnly: a text block is read, not answered.
+func errReadOnly() error {
+	return apperr.Conflict("exercise_read_only", "Текстовый блок не требует ответа")
+}
+
 func homeworkLocked(status string) bool { return status == "pending" || status == "done" }
 
 func strp(s string) *string { return &s }
@@ -125,12 +132,12 @@ func (s *Service) buildView(v viewer, ex exercises.Exercise, ver *exercises.Vers
 		if !has && !revealAll {
 			continue
 		}
-		view := AnswerView{QuestionID: q.ID, Selected: a.Selected, Checked: a.Checked}
+		view := AnswerView{QuestionID: q.ID, Selected: a.Selected, Text: a.Text, Checked: a.Checked}
 		if view.Selected == nil {
 			view.Selected = []uuid.UUID{}
 		}
 		if revealAll || (instant && a.Checked) {
-			switch exercises.GradeQuestion(key[q.ID], a.Selected) {
+			switch ver.Grade(q, a.Response()) {
 			case exercises.Correct:
 				view.Result = strp("correct")
 			case exercises.Wrong:
@@ -138,9 +145,13 @@ func (s *Service) buildView(v viewer, ex exercises.Exercise, ver *exercises.Vers
 			default:
 				view.Result = strp("unanswered")
 			}
-			for _, o := range q.Options {
-				if key[q.ID][o.ID] {
-					view.CorrectOptionIDs = append(view.CorrectOptionIDs, o.ID)
+			if ver.Kind == exercises.KindGaps {
+				view.CorrectAnswers = exercises.CorrectTexts(q)
+			} else {
+				for _, o := range q.Options {
+					if key[q.ID][o.ID] {
+						view.CorrectOptionIDs = append(view.CorrectOptionIDs, o.ID)
+					}
 				}
 			}
 		}
@@ -368,6 +379,9 @@ func (s *Service) Start(ctx context.Context, p auth.Principal, classroomID, exer
 	if role != classrooms.MemberStudent {
 		return nil, apperr.New(403, "teacher_cannot_answer", "Преподаватель не выполняет упражнения за ученика")
 	}
+	if !exercises.Gradable(e.Kind) {
+		return nil, errReadOnly()
+	}
 	existing, err := s.repo.Live(ctx, s.repo.Pool(), classroomID, exerciseID, p.UserID)
 	if err != nil && !database.IsNoRows(err) {
 		return nil, err
@@ -486,7 +500,7 @@ func (s *Service) Answer(ctx context.Context, p auth.Principal, attemptID, quest
 			return err
 		}
 		if prev, ok := ans[a.ID][questionID]; ok && prev.Checked {
-			if sameSet(prev.Selected, sel) {
+			if sameResponse(prev.Response(), sel) {
 				return nil // idempotent retry of an already checked answer
 			}
 			return apperr.Conflict("answer_locked", "Ответ уже проверен и зафиксирован")
@@ -504,18 +518,32 @@ func (s *Service) Answer(ctx context.Context, p auth.Principal, attemptID, quest
 	return s.View(ctx, p, att.ClassroomID, att.ExerciseID, nil)
 }
 
-// selection validates an answer against the version: the question exists, options belong to it, one option for a
-// single-choice question, "check" only in the instant mode and with something selected. Returns the options
-// without repeats. Shared by student attempts and the teacher preview.
-func selection(v *exercises.Version, questionID uuid.UUID, req AnswerRequest) ([]uuid.UUID, error) {
-	var q *exercises.Question
-	for i := range v.Questions {
-		if v.Questions[i].ID == questionID {
-			q = &v.Questions[i]
-		}
+// selection validates an answer against the version: the question exists; for a test the options belong to it and
+// a single-choice question has one option; for a gap exercise only a typed word (spaces around it are dropped);
+// "check" only in the instant mode and with something given. Returns the answer without repeated options.
+// Shared by student attempts and the teacher preview.
+func selection(v *exercises.Version, questionID uuid.UUID, req AnswerRequest) (exercises.Response, error) {
+	var none exercises.Response
+	q, ok := v.Question(questionID)
+	if !ok {
+		return none, apperr.NotFound("Вопрос")
 	}
-	if q == nil {
-		return nil, apperr.NotFound("Вопрос")
+	instant := v.Settings.CheckMode == exercises.CheckInstant
+	if req.Check && !instant {
+		return none, apperr.BadRequest("check_not_allowed", "Проверка выполняется после завершения")
+	}
+	if v.Kind == exercises.KindGaps {
+		if len(req.OptionIDs) > 0 {
+			return none, apperr.Validation(map[string]string{"option_ids": "В задании с пропуском ответ вписывается словом"})
+		}
+		text := strings.TrimSpace(req.Text)
+		if utf8.RuneCountInString(text) > 100 {
+			return none, apperr.Validation(map[string]string{"text": "Ответ не длиннее 100 символов"})
+		}
+		if req.Check && text == "" {
+			return none, apperr.Validation(map[string]string{"text": "Впишите слово"})
+		}
+		return exercises.Response{Selected: []uuid.UUID{}, Text: text}, nil
 	}
 	valid := map[uuid.UUID]bool{}
 	for _, o := range q.Options {
@@ -525,7 +553,7 @@ func selection(v *exercises.Version, questionID uuid.UUID, req AnswerRequest) ([
 	seen := map[uuid.UUID]bool{}
 	for _, id := range req.OptionIDs {
 		if !valid[id] {
-			return nil, apperr.Validation(map[string]string{"option_ids": "Неизвестный вариант ответа"})
+			return none, apperr.Validation(map[string]string{"option_ids": "Неизвестный вариант ответа"})
 		}
 		if !seen[id] {
 			seen[id] = true
@@ -533,16 +561,17 @@ func selection(v *exercises.Version, questionID uuid.UUID, req AnswerRequest) ([
 		}
 	}
 	if !q.Multiple && len(sel) > 1 {
-		return nil, apperr.Validation(map[string]string{"option_ids": "Можно выбрать только один вариант"})
-	}
-	instant := v.Settings.CheckMode == exercises.CheckInstant
-	if req.Check && !instant {
-		return nil, apperr.BadRequest("check_not_allowed", "Проверка выполняется после завершения")
+		return none, apperr.Validation(map[string]string{"option_ids": "Можно выбрать только один вариант"})
 	}
 	if req.Check && len(sel) == 0 {
-		return nil, apperr.Validation(map[string]string{"option_ids": "Выберите ответ"})
+		return none, apperr.Validation(map[string]string{"option_ids": "Выберите ответ"})
 	}
-	return sel, nil
+	return exercises.Response{Selected: sel}, nil
+}
+
+// sameResponse tells whether a repeated answer is the same as the stored one (idempotent retry).
+func sameResponse(a, b exercises.Response) bool {
+	return sameSet(a.Selected, b.Selected) && a.Text == b.Text
 }
 
 func sameSet(a, b []uuid.UUID) bool {
@@ -649,6 +678,7 @@ func (s *Service) scopeAttempts(ctx context.Context, q database.Querier, classro
 	if err != nil {
 		return nil, nil, err
 	}
+	list = exercises.OnlyGradable(list)
 	ids := make([]uuid.UUID, len(list))
 	for i, e := range list {
 		ids[i] = e.ID
@@ -731,14 +761,16 @@ func (s *Service) snapshot(ctx context.Context, tx pgx.Tx, classroomID, studentI
 			se.AttemptID, se.VersionID, se.Title = &id, a.VersionID, ver.Title
 		}
 		se.Version = ver
-		key := ver.CorrectSet()
 		for _, q := range ver.Questions {
 			x := ans[q.ID]
-			view := AnswerView{QuestionID: q.ID, Selected: x.Selected, Checked: x.Checked}
+			view := AnswerView{QuestionID: q.ID, Selected: x.Selected, Text: x.Text, Checked: x.Checked}
 			if view.Selected == nil {
 				view.Selected = []uuid.UUID{}
 			}
-			switch exercises.GradeQuestion(key[q.ID], x.Selected) {
+			if ver.Kind == exercises.KindGaps {
+				view.CorrectAnswers = exercises.CorrectTexts(q)
+			}
+			switch ver.Grade(q, x.Response()) {
 			case exercises.Correct:
 				view.Result = strp("correct")
 			case exercises.Wrong:
@@ -787,10 +819,11 @@ func (s *Service) ReopenScope(ctx context.Context, tx pgx.Tx, classroomID, lesso
 		if err := s.repo.Reopen(ctx, tx, a.ID); err != nil {
 			return err
 		}
-		key := versions[a.VersionID].CorrectSet()
+		ver := versions[a.VersionID]
 		var unlock []uuid.UUID
 		for qid, ans := range answers[a.ID] {
-			if ans.Checked && exercises.GradeQuestion(key[qid], ans.Selected) != exercises.Correct {
+			q, ok := ver.Question(qid)
+			if ans.Checked && (!ok || ver.Grade(q, ans.Response()) != exercises.Correct) {
 				unlock = append(unlock, qid)
 			}
 		}
@@ -830,7 +863,7 @@ func (s *Service) PointsFor(ctx context.Context, classroomID uuid.UUID, lessonID
 		if err != nil {
 			return nil, err
 		}
-		list = append(list, l...)
+		list = append(list, exercises.OnlyGradable(l)...)
 	}
 	if len(list) == 0 || len(studentIDs) == 0 {
 		return out, nil
@@ -1053,6 +1086,9 @@ func (s *Service) PreviewStart(ctx context.Context, p auth.Principal, exerciseID
 	if err != nil {
 		return nil, err
 	}
+	if !exercises.Gradable(e.Kind) {
+		return nil, errReadOnly()
+	}
 	vs, err := s.ex.Versions(ctx, []uuid.UUID{e.VersionID})
 	if err != nil {
 		return nil, err
@@ -1120,7 +1156,7 @@ func (s *Service) PreviewAnswer(ctx context.Context, p auth.Principal, attemptID
 			return err
 		}
 		if prev, ok := ans[a.ID][questionID]; ok && prev.Checked {
-			if sameSet(prev.Selected, sel) {
+			if sameResponse(prev.Response(), sel) {
 				return nil
 			}
 			return apperr.Conflict("answer_locked", "Ответ уже проверен и зафиксирован")

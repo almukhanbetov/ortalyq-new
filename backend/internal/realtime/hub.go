@@ -28,6 +28,12 @@ const (
 	EventMaterialsChanged  = "materials.changed"
 	// EventMarathonChanged: lessons, students, progress or dates of a marathon changed (notification only).
 	EventMarathonChanged = "marathon.changed"
+	// Whiteboard of a lesson: opened, saved by the teacher, closed (notifications only; the board is read via REST).
+	EventBoardOpened  = "board.opened"
+	EventBoardUpdated = "board.updated"
+	EventBoardClosed  = "board.closed"
+	// EventBoardDrawers: the teacher let a student draw on the lesson board or took it back.
+	EventBoardDrawers = "board.drawers"
 )
 
 type Event struct {

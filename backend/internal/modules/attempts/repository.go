@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"ortalyq/backend/internal/database"
+	"ortalyq/backend/internal/modules/exercises"
 )
 
 type Repository struct{ pool *pgxpool.Pool }
@@ -130,7 +131,7 @@ func (r *Repository) Answers(ctx context.Context, q database.Querier, attemptIDs
 	if len(attemptIDs) == 0 {
 		return out, nil
 	}
-	rows, err := q.Query(ctx, `SELECT attempt_id, question_id, selected_option_ids, checked, updated_at FROM attempt_answers WHERE attempt_id = ANY($1)`, attemptIDs)
+	rows, err := q.Query(ctx, `SELECT attempt_id, question_id, selected_option_ids, answer_text, checked, updated_at FROM attempt_answers WHERE attempt_id = ANY($1)`, attemptIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +139,7 @@ func (r *Repository) Answers(ctx context.Context, q database.Querier, attemptIDs
 	for rows.Next() {
 		var aid uuid.UUID
 		var a Answer
-		if err := rows.Scan(&aid, &a.QuestionID, &a.Selected, &a.Checked, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&aid, &a.QuestionID, &a.Selected, &a.Text, &a.Checked, &a.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if out[aid] == nil {
@@ -149,11 +150,11 @@ func (r *Repository) Answers(ctx context.Context, q database.Querier, attemptIDs
 	return out, rows.Err()
 }
 
-func (r *Repository) UpsertAnswer(ctx context.Context, q database.Querier, attemptID, questionID uuid.UUID, selected []uuid.UUID, checked bool) error {
-	_, err := q.Exec(ctx, `INSERT INTO attempt_answers (attempt_id, question_id, selected_option_ids, checked)
-		VALUES ($1, $2, $3, $4)
+func (r *Repository) UpsertAnswer(ctx context.Context, q database.Querier, attemptID, questionID uuid.UUID, resp exercises.Response, checked bool) error {
+	_, err := q.Exec(ctx, `INSERT INTO attempt_answers (attempt_id, question_id, selected_option_ids, answer_text, checked)
+		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (attempt_id, question_id) DO UPDATE SET selected_option_ids = EXCLUDED.selected_option_ids,
-		checked = EXCLUDED.checked, updated_at = now()`, attemptID, questionID, selected, checked)
+		answer_text = EXCLUDED.answer_text, checked = EXCLUDED.checked, updated_at = now()`, attemptID, questionID, resp.Selected, resp.Text, checked)
 	if err == nil {
 		_, err = q.Exec(ctx, `UPDATE attempts SET updated_at = now() WHERE id = $1`, attemptID)
 	}
@@ -282,7 +283,7 @@ func (r *Repository) PreviewAnswers(ctx context.Context, q database.Querier, att
 	if len(attemptIDs) == 0 {
 		return out, nil
 	}
-	rows, err := q.Query(ctx, `SELECT attempt_id, question_id, selected_option_ids, checked, updated_at FROM preview_answers WHERE attempt_id = ANY($1)`, attemptIDs)
+	rows, err := q.Query(ctx, `SELECT attempt_id, question_id, selected_option_ids, answer_text, checked, updated_at FROM preview_answers WHERE attempt_id = ANY($1)`, attemptIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +291,7 @@ func (r *Repository) PreviewAnswers(ctx context.Context, q database.Querier, att
 	for rows.Next() {
 		var aid uuid.UUID
 		var a Answer
-		if err := rows.Scan(&aid, &a.QuestionID, &a.Selected, &a.Checked, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&aid, &a.QuestionID, &a.Selected, &a.Text, &a.Checked, &a.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if out[aid] == nil {
@@ -301,10 +302,10 @@ func (r *Repository) PreviewAnswers(ctx context.Context, q database.Querier, att
 	return out, rows.Err()
 }
 
-func (r *Repository) PreviewUpsertAnswer(ctx context.Context, q database.Querier, attemptID, questionID uuid.UUID, selected []uuid.UUID, checked bool) error {
-	_, err := q.Exec(ctx, `INSERT INTO preview_answers (attempt_id, question_id, selected_option_ids, checked) VALUES ($1, $2, $3, $4)
+func (r *Repository) PreviewUpsertAnswer(ctx context.Context, q database.Querier, attemptID, questionID uuid.UUID, resp exercises.Response, checked bool) error {
+	_, err := q.Exec(ctx, `INSERT INTO preview_answers (attempt_id, question_id, selected_option_ids, answer_text, checked) VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (attempt_id, question_id) DO UPDATE SET selected_option_ids = EXCLUDED.selected_option_ids,
-		checked = EXCLUDED.checked, updated_at = now()`, attemptID, questionID, selected, checked)
+		answer_text = EXCLUDED.answer_text, checked = EXCLUDED.checked, updated_at = now()`, attemptID, questionID, resp.Selected, resp.Text, checked)
 	if err == nil {
 		_, err = q.Exec(ctx, `UPDATE preview_attempts SET updated_at = now() WHERE id = $1`, attemptID)
 	}

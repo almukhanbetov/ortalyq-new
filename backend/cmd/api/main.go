@@ -3,6 +3,7 @@
 //	api serve            start HTTP server (default)
 //	api migrate up|down|status|reset
 //	api seed             local demo data (APP_ENV=local only)
+//	api seed-course [teacher-email]   load the author courses into a teacher's materials (APP_ENV=local only; repeatable)
 //	api create-admin <email> <full name>   first administrator; password is read from stdin
 package main
 
@@ -48,6 +49,8 @@ func run(args []string) error {
 		return database.Migrate(cfg.DatabaseURL, sub)
 	case "seed":
 		return seed(cfg)
+	case "seed-course":
+		return seedCourse(cfg, args[1:])
 	case "create-admin":
 		return createAdmin(cfg, args[1:], os.Stdin)
 	case "serve":

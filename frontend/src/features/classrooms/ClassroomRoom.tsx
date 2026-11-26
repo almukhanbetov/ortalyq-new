@@ -9,7 +9,7 @@ import {
   ArrowLeft, BookOpenCheck, Check, ChevronLeft, ChevronRight, Flag, Languages, ListOrdered, Lock, MessageCircle, PanelRight, Pencil, PenTool, Shuffle, Timer, Video, WifiOff,
 } from 'lucide-react';
 import { AvatarStack, Button, CountBubble, EmptyState, ErrorState, IconButton, Loading, LogoMark, QueryState, Select, Tabs, cn, useToast } from '@/components/ui';
-import { attemptsApi, classroomsApi, gradingApi, homeworkApi } from '@/lib/api/endpoints';
+import { attemptsApi, classBoardApi, classroomsApi, gradingApi, homeworkApi } from '@/lib/api/endpoints';
 import { qk } from '@/lib/queryKeys';
 import { useI18n } from '@/lib/i18n';
 import { errorMessage } from '@/lib/errors';
@@ -21,7 +21,8 @@ import { HomeworkPanel } from '@/features/homework/HomeworkPanel';
 import { LessonPicker } from '@/features/materials/LessonPicker';
 import { ChatPanel } from '@/features/chat/ChatPanel';
 import { applyChatEvent } from '@/features/chat/chatCache';
-import { CLASSES_ROUTE, marathonUrl } from '@/lib/routes';
+import { CLASSES_ROUTE, MATERIALS_BOARDS_ROUTE, marathonUrl } from '@/lib/routes';
+import { ClassBoardStage } from '@/features/boards/ClassBoardStage';
 
 type Tab = 'lesson' | 'homework';
 const FINISH = 'finish';
@@ -38,6 +39,7 @@ export function ClassroomRoom({ id, me }: { id: string; me: Me }) {
   const [sectionsOpen, setSectionsOpen] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [boardHidden, setBoardHidden] = useState(false);
 
   const classroom = useQuery({ queryKey: qk.classroom(id), queryFn: () => classroomsApi.get(id) });
   const c = classroom.data;
@@ -46,6 +48,10 @@ export function ClassroomRoom({ id, me }: { id: string; me: Me }) {
   const student = c?.members.find((m) => m.role === 'student');
   const studentId = teacher ? student?.user_id : me.id;
   const lessonId = c?.current_lesson?.lesson_id;
+  // The board open in this lesson (null when none). It is shown at once when opened; «Вернуться к уроку» hides it.
+  const classBoard = useQuery({ queryKey: qk.classBoard(id), queryFn: () => classBoardApi.get(id), enabled: !!c && c.lesson_type !== 'marathon' });
+  const board = classBoard.data?.board ?? null;
+  const showBoard = !!board && !boardHidden;
   // Marathons have their own page; the classroom room is only for teacher-led classes.
   useEffect(() => {
     if (c?.lesson_type === 'marathon') router.replace(marathonUrl(c.id));
@@ -86,6 +92,15 @@ export function ClassroomRoom({ id, me }: { id: string; me: Me }) {
         case 'classroom.lesson_changed':
           qc.invalidateQueries({ queryKey: qk.classroom(id) });
           break;
+        case 'board.opened':
+          setBoardHidden(false);
+          qc.invalidateQueries({ queryKey: qk.classBoard(id) });
+          break;
+        case 'board.updated':
+        case 'board.closed':
+        case 'board.drawers':
+          qc.invalidateQueries({ queryKey: qk.classBoard(id) });
+          break;
         case 'attempt.updated':
         case 'materials.changed':
           qc.invalidateQueries({ queryKey: ['lesson-exercises', id] });
@@ -114,10 +129,13 @@ export function ClassroomRoom({ id, me }: { id: string; me: Me }) {
       )}
       <div className="flex min-h-0 flex-1">
         <Toolbar teacher={teacher} lessonId={lessonId} chatOpen={chatOpen} unread={unread} sectionsOpen={sectionsOpen && !chatOpen}
-          onChat={() => setChatOpen((o) => !o)} onSections={() => { setChatOpen(false); setSectionsOpen((o) => !o); }} showSections={tab === 'lesson' && !!lessonId} />
+          onChat={() => setChatOpen((o) => !o)} onSections={() => { setChatOpen(false); setSectionsOpen((o) => !o); }} showSections={tab === 'lesson' && !!lessonId && !showBoard}
+          board={{ open: !!board, shown: showBoard, toggle: () => setBoardHidden((h) => !h) }} />
 
         <main id="main" className="min-w-0 flex-1 overflow-y-auto px-4 py-6 pb-24 scrollbar-thin md:px-8 md:pb-6">
-          {!lessonId ? (
+          {showBoard && board ? (
+            <ClassBoardStage classroomId={id} view={classBoard.data!} teacher={teacher} members={c.members} onBack={() => setBoardHidden(true)} />
+          ) : !lessonId ? (
             <EmptyState icon={<BookOpenCheck size={26} />} title={teacher ? t('classroom.noLessonTeacher') : t('classroom.noLessonStudent')}
               action={teacher ? <Button onClick={() => setPickerOpen(true)}>{t('classroom.chooseLesson')}</Button> : undefined} className="min-h-[60vh]" />
           ) : tab === 'homework' ? (
@@ -189,13 +207,15 @@ function HomeworkDot({ status, teacher }: { status: 'not_submitted' | 'pending' 
   return <span className={cn('inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold text-white', tone)} title={label} aria-label={label} role="img">!</span>;
 }
 
-function ToolButton({ label, icon, onClick, active, disabled, badge, href, className, expanded }: {
+function ToolButton({ label, icon, onClick, active, disabled, disabledNote, badge, href, className, expanded }: {
   label: string; icon: ReactNode; onClick?: () => void; active?: boolean; disabled?: boolean; badge?: number; href?: string; className?: string; expanded: boolean;
+  /** Why a disabled tool is off (default: not available at this stage). */
+  disabledNote?: string;
 }) {
   const { t } = useI18n();
   const cls = cn('relative flex h-11 shrink-0 items-center rounded-xl transition-colors max-md:w-11 max-md:justify-center md:w-full md:gap-3 md:px-[11px]', className,
     disabled ? 'cursor-not-allowed text-ink-faint' : active ? 'bg-primary-soft text-primary' : 'text-ink-muted hover:bg-surface-hover hover:text-ink');
-  const title = disabled ? `${label} — ${t('common.unavailable')}` : label;
+  const title = disabled ? `${label} — ${disabledNote ?? t('common.unavailable')}` : label;
   const inner = (
     <>
       <span className="relative flex w-[22px] shrink-0 justify-center">
@@ -207,7 +227,7 @@ function ToolButton({ label, icon, onClick, active, disabled, badge, href, class
       <span aria-hidden className={cn('hidden min-w-0 flex-1 items-baseline justify-between gap-2 whitespace-nowrap text-left text-base font-medium transition-opacity duration-150 md:flex',
         expanded ? 'opacity-100' : 'pointer-events-none opacity-0')}>
         <span className="truncate">{label}</span>
-        {disabled && <span className="text-xs font-normal">{t('common.soon')}</span>}
+        {disabled && !disabledNote && <span className="text-xs font-normal">{t('common.soon')}</span>}
       </span>
     </>
   );
@@ -228,8 +248,9 @@ const TOOLBAR_EXPANDED = 232;
  * the rail expands over the lesson on hover/keyboard focus (no layout shift) and collapses 180ms
  * after the pointer leaves. Phones: bottom bar, tools open on tap.
  */
-function Toolbar({ teacher, lessonId, chatOpen, unread, sectionsOpen, onChat, onSections, showSections }: {
+function Toolbar({ teacher, lessonId, chatOpen, unread, sectionsOpen, onChat, onSections, showSections, board }: {
   teacher: boolean; lessonId?: string; chatOpen: boolean; unread: number; sectionsOpen: boolean; onChat: () => void; onSections: () => void; showSections: boolean;
+  board: { open: boolean; shown: boolean; toggle: () => void };
 }) {
   const { t } = useI18n();
   const rail = useRef<HTMLElement>(null);
@@ -255,7 +276,14 @@ function Toolbar({ teacher, lessonId, chatOpen, unread, sectionsOpen, onChat, on
         {teacher && lessonId && <ToolButton {...tb} label={t('classroom.toolEdit')} icon={<Pencil size={20} />} href={`/materials/lessons/${lessonId}`} />}
         <span className="my-1 hidden h-px w-full shrink-0 bg-line md:block" aria-hidden />
         <ToolButton {...tb} label={t('classroom.toolVideo')} icon={<Video size={21} />} disabled />
-        <ToolButton {...tb} label={t('classroom.toolBoard')} icon={<PenTool size={20} />} disabled />
+        {/* «Доска»: shows / hides the board open in the lesson; with none open, the teacher goes to their boards to open one. */}
+        {board.open ? (
+          <ToolButton {...tb} label={t('classroom.toolBoard')} icon={<PenTool size={20} />} active={board.shown} onClick={board.toggle} />
+        ) : teacher ? (
+          <ToolButton {...tb} label={t('classroom.toolBoard')} icon={<PenTool size={20} />} href={MATERIALS_BOARDS_ROUTE} />
+        ) : (
+          <ToolButton {...tb} label={t('classroom.toolBoard')} icon={<PenTool size={20} />} disabled disabledNote={t('boards.notOpenInClass')} />
+        )}
         <ToolButton {...tb} label={t('classroom.toolDictionary')} icon={<Languages size={20} />} disabled />
         <ToolButton {...tb} label={t('classroom.toolTimer')} icon={<Timer size={20} />} disabled />
       </nav>

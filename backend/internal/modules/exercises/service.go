@@ -33,6 +33,23 @@ func NewService(repo *Repository, lessons Lessons, notify Notifier) *Service {
 
 func (s *Service) Catalog() []CatalogEntry { return Catalog }
 
+// CheckContent validates an exercise body (questions, options, title) without the database, with the same
+// rules as the editor. Settings that need the database (score categories) are not checked here.
+func CheckContent(kind string, req SaveRequest) map[string]string {
+	h, ok := handlerFor(kind)
+	if !ok {
+		return map[string]string{"kind": "Этот тип упражнения пока недоступен"}
+	}
+	errs := h.Validate(req)
+	if t := strings.TrimSpace(req.Title); t == "" || len([]rune(t)) > 200 {
+		errs["title"] = "Введите заголовок"
+	}
+	if m := req.Settings.CheckMode; m != CheckInstant && m != CheckAfter {
+		errs["settings.check_mode"] = "Неизвестный режим проверки"
+	}
+	return errs
+}
+
 func (s *Service) validate(ctx context.Context, p auth.Principal, kind string, req *SaveRequest) error {
 	h, ok := handlerFor(kind)
 	if !ok {
@@ -123,6 +140,7 @@ func (s *Service) Create(ctx context.Context, p auth.Principal, lessonID uuid.UU
 		}
 	case ScopeHomework:
 		req.SectionID = nil
+		v.Check(req.Kind != KindText, "kind", "Текстовый блок добавляется в раздел урока, а не в домашнюю работу")
 	default:
 		v.Add("scope", "Укажите, куда добавить упражнение")
 	}
@@ -218,6 +236,9 @@ func (s *Service) CopyToHomework(ctx context.Context, p auth.Principal, id uuid.
 	if err != nil {
 		return nil, err
 	}
+	if !Gradable(src.Kind) {
+		return nil, apperr.Conflict("text_not_homework", "Текстовый блок нельзя скопировать в домашнюю работу")
+	}
 	v := src.Version
 	req := SaveRequest{Title: v.Title, Settings: v.Settings, Hidden: &src.Hidden}
 	for _, q := range v.Questions {
@@ -278,12 +299,11 @@ func (s *Service) Stats(ctx context.Context, p auth.Principal, id uuid.UUID) (*S
 	if err != nil {
 		return nil, err
 	}
-	key := e.Version.CorrectSet()
 	st := &Stats{VersionNumber: e.Version.Number, Attempts: attempts, Finished: finished, Questions: []QuestionStat{}}
 	for _, q := range e.Version.Questions {
 		qs := QuestionStat{QuestionID: q.ID, Prompt: q.Prompt}
-		for _, sel := range answers[q.ID] {
-			switch GradeQuestion(key[q.ID], sel) {
+		for _, resp := range answers[q.ID] {
+			switch e.Version.Grade(q, resp) {
 			case Correct:
 				qs.Correct++
 			case Wrong:

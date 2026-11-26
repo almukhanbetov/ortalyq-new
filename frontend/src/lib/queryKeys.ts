@@ -14,6 +14,12 @@ export const qk = {
   homework: (cid: string, lid: string, sid?: string) => ['homework', cid, lid, sid ?? 'self'] as const,
   messages: (cid: string) => ['messages', cid] as const,
   courses: (f: LessonFilter) => ['courses', f] as const,
+  library: (q: string) => ['material-catalog', q] as const,
+  boards: (q: string) => ['boards', q] as const,
+  board: (id: string) => ['board', id] as const,
+  /** Under 'classroom' so a socket reconnect re-reads it with the other class queries. */
+  classBoard: (cid: string) => ['classroom', cid, 'board'] as const,
+  libraryCourse: (key: string) => ['material-catalog', 'course', key] as const,
   course: (id: string, f: LessonFilter = {}) => ['course', id, f] as const,
   lesson: (id: string) => ['lesson', id] as const,
   editorExercises: (lid: string, scope: Scope) => ['editor-exercises', lid, scope] as const,

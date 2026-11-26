@@ -14,7 +14,10 @@ const icons: Record<string, ReactNode> = {
   word_set: <CheckSquare size={22} />, note: <StickyNote size={22} />, link: <Link2 size={22} />, divider: <Minus size={22} />, integrations: <Plug size={22} />,
 };
 
-export function CatalogModal({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (kind: string) => void }) {
+/** Kinds that cannot go to homework (read-only blocks have no answer to send). */
+const LESSON_ONLY = new Set(['text']);
+
+export function CatalogModal({ open, onClose, onPick, homework }: { open: boolean; onClose: () => void; onPick: (kind: string) => void; homework?: boolean }) {
   const t = useT();
   const q = useQuery({ queryKey: qk.catalog, queryFn: exercisesApi.catalog, enabled: open, staleTime: Infinity });
   return (
@@ -23,7 +26,7 @@ export function CatalogModal({ open, onClose, onPick }: { open: boolean; onClose
       <QueryState query={q}>
         {(data) => (
           <ul className="grid grid-cols-2 gap-3 pb-4 sm:grid-cols-3 md:grid-cols-4">
-            {data.items.map((it) => (
+            {data.items.map((x) => ({ ...x, available: x.available && !(homework && LESSON_ONLY.has(x.kind)) })).map((it) => (
               <li key={it.kind}>
                 <button type="button" disabled={!it.available} onClick={() => onPick(it.kind)}
                   aria-disabled={!it.available}

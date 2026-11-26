@@ -163,7 +163,7 @@ function snapshotView(s: SnapshotExercise): ExerciseView {
     exercise_id: s.exercise_id,
     scope: 'homework',
     section_id: null,
-    kind: 'test',
+    kind: s.version.kind ?? 'test',
     position: 0,
     hidden: false,
     locked: true,

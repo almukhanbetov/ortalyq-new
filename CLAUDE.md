@@ -24,7 +24,7 @@
 
 Зависимости между модулями задаются интерфейсами в пакете-потребителе и передаются через конструкторы в `internal/router/router.go`. Пример: `attempts.HomeworkState` реализован в `homework.Repository`.
 
-Модули: `auth` (сессии, вход, роли), `users` (админ, назначения), `classrooms` (классы, члены, текущий урок + общие проверки доступа: `MemberRole`, `RequireLesson`, `ResolveStudent`), `materials`, `exercises` (каталог, версии, валидация теста через `KindHandler`), `attempts` (старт, ответ, проверка, завершение, сброс, баллы, снимки ДЗ), `homework`, `grading` (разделы, урок, оценка, сводка), `chat` (+ GIPHY-клиент), `uploads`.
+Модули: `auth` (сессии, вход, роли), `users` (админ, назначения), `classrooms` (классы, члены, текущий урок + общие проверки доступа: `MemberRole`, `RequireLesson`, `ResolveStudent`), `materials`, `exercises` (каталог, версии, валидация теста через `KindHandler`), `attempts` (старт, ответ, проверка, завершение, сброс, баллы, снимки ДЗ), `homework`, `grading` (разделы, урок, оценка, сводка), `chat` (+ GIPHY-клиент), `uploads`, `library` («Материалы» → «Каталог», копия курса из `internal/content`), `boards` (личные интерактивные доски преподавателя; одна доска на класс в `classroom_boards`, ученик читает её через занятие; по разрешению в `classroom_board_drawers` рисует карандашом, каждый штрих добавляется отдельным действием с `client_id`).
 
 Ошибки возвращаются как `*apperr.Error` и отдаются в едином формате `{"error":{"code","message","fields"}}` (`httpx.Fail`).
 
@@ -47,6 +47,7 @@
 ```bash
 docker compose up -d --build && docker compose exec api api seed   # весь стек
 ./scripts/reset-demo-db.sh                                         # чистая демо-БД (локально)
+cd backend && go run ./cmd/api seed-course [email]                 # авторские курсы internal/content (повторяемо)
 cd backend && go vet ./... && TEST_DATABASE_URL=...ortalyq_new_test go test ./...
 cd frontend && npm run typecheck && npm run lint && npm run build
 cd frontend && node scripts/e2e.mjs                                # браузерный сценарий + скриншоты
@@ -66,4 +67,4 @@ cd frontend && node scripts/e2e.mjs                                # брауз�
 
 ## Границы текущего этапа (не реализовывать без запроса)
 
-Видеозвонки, камера и микрофон, демонстрация экрана, доска, словарь и переводчик, таймер класса, расписание, ИИ-генерация, остальные типы упражнений, интеграции (Miro, Wordwall, LearningApps, Quizlet…), оплата и тарифы, общая аналитика школы, групповые классы.
+Видеозвонки, камера и микрофон, демонстрация экрана, другие инструменты доски для ученика, кроме карандаша (совместное рисование карандашом по разрешению преподавателя уже есть), словарь и переводчик, таймер класса, расписание, ИИ-генерация, остальные типы упражнений, интеграции (Miro, Wordwall, LearningApps, Quizlet…), оплата и тарифы, общая аналитика школы, групповые классы.

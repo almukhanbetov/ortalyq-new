@@ -94,10 +94,19 @@ func imageInfo(path string, head []byte) (string, int, int, error) {
 	return ct, cfg.Width, cfg.Height, nil
 }
 
-// SaveImage stores an appearance picture of a class. The caller has already checked that the principal may change
-// the class appearance. The file is checked by its content: PNG, JPEG or WebP, at most ImageMaxBytes, each side
-// between ImageMinSide and ImageMaxSide pixels.
-func (s *Service) SaveImage(ctx context.Context, classroomID, uploaderID uuid.UUID, original string, size int64, r io.Reader) (*Attachment, error) {
+// StoredImage is a checked picture written to the upload directory.
+type StoredImage struct {
+	StoredName string
+	MimeType   string
+	SizeBytes  int64
+	Width      int
+	Height     int
+}
+
+// StoreImage writes a picture to the upload directory after checking its content: PNG, JPEG or WebP, at most
+// ImageMaxBytes, each side between ImageMinSide and ImageMaxSide pixels. The caller records it (attachments for
+// class pictures, board_images for whiteboards) and removes the file with RemoveStored if recording fails.
+func (s *Service) StoreImage(size int64, r io.Reader) (*StoredImage, error) {
 	if size <= 0 {
 		return nil, apperr.Validation(map[string]string{"file": "Файл пустой"})
 	}
@@ -132,8 +141,8 @@ func (s *Service) SaveImage(ctx context.Context, classroomID, uploaderID uuid.UU
 		err = ErrImageTooLarge()
 	}
 	var mime string
+	var w, h int
 	if err == nil {
-		var w, h int
 		mime, w, h, err = imageInfo(path, head)
 		if err == nil && (w < ImageMinSide || h < ImageMinSide || w > ImageMaxSide || h > ImageMaxSide) {
 			err = ErrImageSize()
@@ -143,6 +152,56 @@ func (s *Service) SaveImage(ctx context.Context, classroomID, uploaderID uuid.UU
 		_ = os.Remove(path)
 		return nil, err
 	}
+	return &StoredImage{StoredName: stored, MimeType: mime, SizeBytes: written, Width: w, Height: h}, nil
+}
+
+// OpenStored opens a stored file by its name (the caller has checked access).
+func (s *Service) OpenStored(name string) (*os.File, error) {
+	return os.Open(filepath.Join(s.dir, filepath.Base(name)))
+}
+
+// CopyStored copies a stored file under a new random name with the same extension (a copied board gets its own
+// picture files, so removing one board's pictures never touches the other's).
+func (s *Service) CopyStored(name string) (string, error) {
+	src, err := os.Open(filepath.Join(s.dir, filepath.Base(name)))
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+	rnd := make([]byte, 16)
+	if _, err := rand.Read(rnd); err != nil {
+		return "", err
+	}
+	stored := hex.EncodeToString(rnd) + filepath.Ext(name)
+	path := filepath.Join(s.dir, stored)
+	dst, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o640)
+	if err != nil {
+		return "", err
+	}
+	_, err = io.Copy(dst, src)
+	if cerr := dst.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	return stored, nil
+}
+
+// RemoveStored deletes a stored file; a missing file is not an error.
+func (s *Service) RemoveStored(name string) {
+	_ = os.Remove(filepath.Join(s.dir, filepath.Base(name)))
+}
+
+// SaveImage stores an appearance picture of a class. The caller has already checked that the principal may change
+// the class appearance.
+func (s *Service) SaveImage(ctx context.Context, classroomID, uploaderID uuid.UUID, original string, size int64, r io.Reader) (*Attachment, error) {
+	img, err := s.StoreImage(size, r)
+	if err != nil {
+		return nil, err
+	}
+	stored, mime, written, path := img.StoredName, img.MimeType, img.SizeBytes, filepath.Join(s.dir, img.StoredName)
 	uid := uploaderID
 	a := &Attachment{ClassroomID: classroomID, UploaderID: &uid, OriginalName: sanitizeName(original), StoredName: stored, MimeType: mime, SizeBytes: written, Purpose: PurposeAppearance}
 	if err := s.repo.Insert(ctx, a); err != nil {

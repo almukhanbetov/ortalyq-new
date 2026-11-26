@@ -17,7 +17,7 @@ async function login(email, pw, opts = {}) {
   p.on('pageerror', (e) => errors.push(e.message));
   await p.goto(`${WEB}/login`);
   await p.getByLabel('Email').fill(email);
-  await p.getByLabel('Пароль').fill(pw);
+  await p.getByLabel('Пароль', { exact: true }).fill(pw);
   await p.getByRole('button', { name: 'Войти' }).click();
   await p.waitForURL(/\/classes$/);
   await p.evaluate(() => { localStorage.removeItem('ortalyq_classes_view'); localStorage.removeItem('ortalyq_classes_sort'); localStorage.setItem('ortalyq_sidebar_pinned', '0'); });
