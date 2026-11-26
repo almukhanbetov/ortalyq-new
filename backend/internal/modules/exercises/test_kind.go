@@ -46,6 +46,27 @@ func (testKind) Validate(req SaveRequest) map[string]string {
 	return errs
 }
 
+// Grade: the selection must match the set of correct options exactly; a typed text is ignored.
+func (testKind) Grade(q Question, r Response) AnswerResult {
+	correct := map[uuid.UUID]bool{}
+	for _, o := range q.Options {
+		if o.IsCorrect != nil && *o.IsCorrect {
+			correct[o.ID] = true
+		}
+	}
+	return GradeQuestion(correct, r.Selected)
+}
+
+// Sanitize keeps the option labels (the student chooses among them) and drops is_correct.
+func (testKind) Sanitize(q Question) Question {
+	nq := q
+	nq.Options = make([]Option, len(q.Options))
+	for j, o := range q.Options {
+		nq.Options[j] = Option{ID: o.ID, Label: o.Label}
+	}
+	return nq
+}
+
 // AnswerResult is the outcome of grading one question.
 type AnswerResult int
 

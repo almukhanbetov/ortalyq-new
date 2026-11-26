@@ -278,12 +278,11 @@ func (s *Service) Stats(ctx context.Context, p auth.Principal, id uuid.UUID) (*S
 	if err != nil {
 		return nil, err
 	}
-	key := e.Version.CorrectSet()
 	st := &Stats{VersionNumber: e.Version.Number, Attempts: attempts, Finished: finished, Questions: []QuestionStat{}}
 	for _, q := range e.Version.Questions {
 		qs := QuestionStat{QuestionID: q.ID, Prompt: q.Prompt}
-		for _, sel := range answers[q.ID] {
-			switch GradeQuestion(key[q.ID], sel) {
+		for _, resp := range answers[q.ID] {
+			switch e.Version.Grade(q, resp) {
 			case Correct:
 				qs.Correct++
 			case Wrong:

@@ -10,6 +10,7 @@ import { formatDuration } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { errorMessage } from '@/lib/errors';
 import type { AnswerView, ExerciseView, Question } from '@/types/api';
+import { GapQuestion } from './GapQuestion';
 
 /** Replaces an exercise view in every cached lesson list of this classroom. */
 export function useExerciseCache(classroomId: string) {
@@ -80,11 +81,14 @@ export function TestPlayer({ classroomId, view, role, studentId, studentName, in
   const timed = v.settings.timer_enabled && !!v.settings.timer_seconds;
   const instant = v.settings.check_mode === 'instant';
   const finished = a?.status === 'finished';
+  // «Слова и пропуски»: the same attempt flow, but each question is a phrase with a typed word.
+  const gaps = (v.kind ?? view.kind) === 'gaps';
   const [pending, setPending] = useState<Record<string, string[]>>({});
+  const [texts, setTexts] = useState<Record<string, string>>({}); // typed words not yet saved
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
 
-  useEffect(() => setPending({}), [a?.id]);
+  useEffect(() => { setPending({}); setTexts({}); }, [a?.id]);
 
   const onErr = (e: unknown) => {
     if (e instanceof ApiError && (e.code === 'attempt_expired' || e.code === 'attempt_finished' || e.code === 'homework_locked' || e.code === 'lesson_review_locked')) {
@@ -95,10 +99,10 @@ export function TestPlayer({ classroomId, view, role, studentId, studentName, in
 
   const start = useMutation({ mutationFn: () => ops.start(), onSuccess: put, onError: onErr });
   const answer = useMutation({
-    mutationFn: async ({ qid, ids, check }: { qid: string; ids: string[]; check: boolean }) => {
+    mutationFn: async ({ qid, ids, check, text }: { qid: string; ids: string[]; check: boolean; text?: string }) => {
       let attemptId = a?.id;
       if (!attemptId) attemptId = (await ops.start()).attempt!.id;
-      return ops.answer(attemptId, qid, ids, check);
+      return ops.answer(attemptId, qid, ids, check, text ?? '');
     },
     onSuccess: (res, vars) => {
       put(res);
@@ -111,6 +115,14 @@ export function TestPlayer({ classroomId, view, role, studentId, studentName, in
         if (JSON.stringify(n[vars.qid]) === JSON.stringify(vars.ids)) delete n[vars.qid];
         return n;
       });
+      if (vars.text !== undefined) {
+        setTexts((m) => {
+          if ((m[vars.qid] ?? '').trim() !== vars.text) return m;
+          const n = { ...m };
+          delete n[vars.qid];
+          return n;
+        });
+      }
     },
     onError: (e, vars) => {
       setPending((p) => {
@@ -142,7 +154,9 @@ export function TestPlayer({ classroomId, view, role, studentId, studentName, in
 
   const locked = view.locked && !finished;
   const interactive = !teacher && !finished && !view.locked && !(timed && !a) && !(remaining !== null && remaining <= 0);
-  const answeredCount = v.questions.filter((q) => (pending[q.id] ?? answers[q.id]?.selected ?? []).length > 0).length;
+  const answeredCount = v.questions.filter((q) => gaps
+    ? (texts[q.id] ?? answers[q.id]?.text ?? '').trim() !== ''
+    : (pending[q.id] ?? answers[q.id]?.selected ?? []).length > 0).length;
 
   const select = (q: Question, optionId: string) => {
     if (!interactive) return;
@@ -158,7 +172,7 @@ export function TestPlayer({ classroomId, view, role, studentId, studentName, in
     <article className="rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-6" aria-labelledby={`ex-${view.exercise_id}`}>
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">{t('catalog.types.test')} · {index + 1}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">{t(gaps ? 'catalog.types.gaps' : 'catalog.types.test')} · {index + 1}</p>
           <h3 id={`ex-${view.exercise_id}`} className="mt-1 text-lg font-bold text-ink">{v.title}</h3>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -193,7 +207,13 @@ export function TestPlayer({ classroomId, view, role, studentId, studentName, in
         </div>
       ) : (
         <ol className="flex flex-col gap-5">
-          {v.questions.map((q, qi) => {
+          {gaps && v.questions.map((q, qi) => (
+            <GapQuestion key={q.id} q={q} index={qi} answer={answers[q.id]} teacher={teacher} finished={finished} instant={instant}
+              interactive={interactive} text={texts[q.id]} busy={answer.isPending}
+              onText={(value) => setTexts((m) => ({ ...m, [q.id]: value }))}
+              onSave={(text, check) => answer.mutate({ qid: q.id, ids: [], text, check })} />
+          ))}
+          {!gaps && v.questions.map((q, qi) => {
             const ans = answers[q.id];
             const selected = pending[q.id] ?? ans?.selected ?? [];
             const revealed = !!ans?.result && (teacher || finished || (instant && ans.checked));

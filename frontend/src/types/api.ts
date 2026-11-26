@@ -352,9 +352,13 @@ export interface Question {
   options: Option[];
 }
 
+/** Exercise kinds that work at this stage. */
+export type ExerciseKind = 'test' | 'gaps';
+
 export interface ExerciseVersion {
   id: string;
   exercise_id: string;
+  kind: ExerciseKind;
   number: number;
   title: string;
   settings: ExerciseSettings;
@@ -410,9 +414,13 @@ export type AnswerResult = 'correct' | 'wrong' | 'unanswered';
 export interface AnswerView {
   question_id: string;
   selected: string[];
+  /** Gap exercises: the student's typed word. */
+  text: string;
   checked: boolean;
   result: AnswerResult | null;
   correct_option_ids: string[] | null;
+  /** Gap exercises: the accepted words, only once the answer is revealed. */
+  correct_answers?: string[];
 }
 
 export interface AttemptSummary {

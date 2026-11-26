@@ -10,8 +10,10 @@ import { exercisesApi } from '@/lib/api/endpoints';
 import { qk } from '@/lib/queryKeys';
 import { useT } from '@/lib/i18n';
 import { errorMessage, fieldErrors } from '@/lib/errors';
-import type { Exercise, Scope } from '@/types/api';
+import type { Exercise, ExerciseKind, Scope } from '@/types/api';
 import { draftFromExercise, emptyOption, emptyQuestion, newDraft, toRequest, validateDraft, type DraftQuestion, type TestDraft } from './testDraft';
+import { newGapsDraft, validateGapsDraft } from './gapsDraft';
+import { GapsEditorFields } from './GapsEditorFields';
 
 type Tab = 'exercise' | 'settings' | 'stats';
 
@@ -20,7 +22,12 @@ export interface EditorTarget {
   scope: Scope;
   sectionId: string | null;
   exercise?: Exercise; // undefined = create
+  /** Kind of a new exercise (from the catalog); an existing one keeps its own kind. */
+  kind?: ExerciseKind;
 }
+
+const KINDS: ExerciseKind[] = ['test', 'gaps'];
+export const isExerciseKind = (k: string): k is ExerciseKind => (KINDS as string[]).includes(k);
 
 export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget | null; onClose: () => void }) {
   const t = useT();
@@ -31,10 +38,12 @@ export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget 
   const [initial, setInitial] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmClose, setConfirmClose] = useState(false);
+  const kind: ExerciseKind = (target?.exercise?.kind as ExerciseKind | undefined) ?? target?.kind ?? 'test';
+  const gaps = kind === 'gaps';
 
   useEffect(() => {
     if (!target) return;
-    const d = target.exercise ? draftFromExercise(target.exercise) : newDraft();
+    const d = target.exercise ? draftFromExercise(target.exercise) : target.kind === 'gaps' ? newGapsDraft() : newDraft();
     setDraft(d);
     setInitial(JSON.stringify(d));
     setErrors({});
@@ -48,7 +57,7 @@ export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget 
     mutationFn: async () => {
       const body = toRequest(draft);
       if (target!.exercise) return exercisesApi.update(target!.exercise.id, body);
-      return exercisesApi.create(target!.lessonId, { ...body, scope: target!.scope, section_id: target!.sectionId, kind: 'test' });
+      return exercisesApi.create(target!.lessonId, { ...body, scope: target!.scope, section_id: target!.sectionId, kind });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['editor-exercises', target!.lessonId] });
@@ -65,7 +74,7 @@ export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget 
   });
 
   const submit = () => {
-    const errs = validateDraft(draft, t);
+    const errs = gaps ? validateGapsDraft(draft, t) : validateDraft(draft, t);
     setErrors(errs);
     if (Object.keys(errs).length) {
       setTab(Object.keys(errs).some((k) => k.startsWith('settings')) ? 'settings' : 'exercise');
@@ -94,7 +103,7 @@ export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget 
   return (
     <>
       <Modal open={!!target} onClose={requestClose} size="lg" bodyClassName="px-0 py-0"
-        title={target?.exercise ? t('editor.titleEdit') : t('editor.titleNew')}
+        title={gaps ? (target?.exercise ? t('editor.titleEditGaps') : t('editor.titleNewGaps')) : target?.exercise ? t('editor.titleEdit') : t('editor.titleNew')}
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-3">
             <p className="max-w-[420px] text-xs text-ink-muted">{target?.exercise ? t('editor.versionNote') : ''}</p>
@@ -118,7 +127,16 @@ export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget 
             <p role="alert" className="mb-4 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-text">{errorMessage(save.error, t)}</p>
           )}
 
-          {tab === 'exercise' && (
+          {tab === 'exercise' && gaps && (
+            <div className="flex flex-col gap-5">
+              <Field label={t('editor.title')} error={errors.title} required>
+                {(p) => <Input {...p} data-autofocus value={draft.title} maxLength={200} placeholder={t('catalog.types.gaps')} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} />}
+              </Field>
+              <GapsEditorFields draft={draft} setDraft={setDraft} errors={errors} />
+            </div>
+          )}
+
+          {tab === 'exercise' && !gaps && (
             <div className="flex flex-col gap-5">
               <Field label={t('editor.title')} error={errors.title} required>
                 {(p) => <Input {...p} data-autofocus value={draft.title} maxLength={200} placeholder={t('editor.titlePlaceholder')} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} />}

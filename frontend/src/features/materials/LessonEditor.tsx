@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowLeft, ArrowUp, Copy, Eye, EyeOff, ListChecks, MoreHorizontal, Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Copy, Eye, EyeOff, ListChecks, MoreHorizontal, Pencil, PencilLine, Plus, Settings2, Trash2 } from 'lucide-react';
 import { Badge, Button, ConfirmDialog, EmptyState, Field, IconButton, Input, Menu, QueryState, Tabs, useToast } from '@/components/ui';
 import { PageCard } from '@/components/layout/PageCard';
 import { exercisesApi, materialsApi } from '@/lib/api/endpoints';
@@ -14,7 +14,7 @@ import { marathonFromParam, marathonUrl, materialUrl } from '@/lib/routes';
 import { errorMessage, fieldErrors } from '@/lib/errors';
 import type { Exercise, Lesson, LessonAttrs, Scope, Section } from '@/types/api';
 import { CatalogModal } from '@/features/exercises/CatalogModal';
-import { ExerciseEditorModal, type EditorTarget } from '@/features/exercises/ExerciseEditorModal';
+import { ExerciseEditorModal, isExerciseKind, type EditorTarget } from '@/features/exercises/ExerciseEditorModal';
 import { TitleModal } from './TitleModal';
 
 export function LessonEditor({ id }: { id: string }) {
@@ -43,7 +43,9 @@ export function LessonEditor({ id }: { id: string }) {
             <HomeworkEditor lessonId={l.id} onAdd={() => setCatalogFor({ scope: 'homework', sectionId: null })} onEdit={(e) => setEditor({ lessonId: l.id, scope: 'homework', sectionId: null, exercise: e })} />
           )}
           <CatalogModal open={!!catalogFor} onClose={() => setCatalogFor(null)}
-            onPick={(kind) => { if (kind === 'test' && catalogFor) { setEditor({ lessonId: l.id, scope: catalogFor.scope, sectionId: catalogFor.sectionId }); setCatalogFor(null); } }} />
+            onPick={(kind) => {
+              if (isExerciseKind(kind) && catalogFor) { setEditor({ lessonId: l.id, scope: catalogFor.scope, sectionId: catalogFor.sectionId, kind }); setCatalogFor(null); }
+            }} />
           <ExerciseEditorModal target={editor} onClose={() => setEditor(null)} />
         </PageCard>
       )}
@@ -209,11 +211,11 @@ function ExerciseRows({ items, lessonId, scope, sectionId, onEdit, emptyText }: 
       <ul className="flex flex-col gap-2">
         {items.map((e, i) => (
           <li key={e.id} className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-text"><ListChecks size={18} /></span>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-text">{e.kind === 'gaps' ? <PencilLine size={18} /> : <ListChecks size={18} />}</span>
             <button type="button" onClick={() => onEdit(e)} className="min-w-0 flex-1 text-left">
               <p className="truncate font-medium text-ink hover:text-primary-text">{e.version.title}</p>
               <p className="text-xs text-ink-muted">
-                {t('catalog.types.test')} · {t('editor.questionsCount', { n: e.version.questions.length })} · v{e.version.number}
+                {t(`catalog.types.${e.kind}`)} · {e.kind === 'gaps' ? e.version.questions[0]?.prompt : t('editor.questionsCount', { n: e.version.questions.length })} · v{e.version.number}
                 {e.copied_from_id ? ` · ${t('materials.copiedFrom')}` : ''}
               </p>
             </button>

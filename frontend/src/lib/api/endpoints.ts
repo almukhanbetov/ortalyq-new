@@ -2,10 +2,10 @@
 import { API_URL, api, request } from './client';
 import type {
   Board,
+  ClassBoardView,
   BoardImage,
   BoardItem,
   BoardSummary,
-  ClassBoardView,
   StudentInviteAccepted, StudentInviteLink, StudentInviteSent,
   Appearance, AppearanceRequest, EffectiveAppearance, ImageSlot, MarathonAppearance,
   Assignment, Attachment, CatalogEntry, Category, ChatMessage, Classroom, Course, Exercise, ExerciseStats, ExerciseView,
@@ -185,8 +185,9 @@ export const attemptsApi = {
   view: (cid: string, eid: string, studentId?: string) => api.get<ExerciseView>(`/classrooms/${cid}/exercises/${eid}`, { student_id: studentId }),
   start: (cid: string, eid: string) => api.post<ExerciseView>(`/classrooms/${cid}/exercises/${eid}/attempt`),
   reset: (cid: string, eid: string, studentId: string) => api.post<ExerciseView>(`/classrooms/${cid}/exercises/${eid}/reset`, { student_id: studentId }),
-  answer: (attemptId: string, questionId: string, optionIds: string[], check: boolean) =>
-    api.put<ExerciseView>(`/attempts/${attemptId}/answers/${questionId}`, { option_ids: optionIds, check }),
+  /** A test answer sends option ids; a gap answer sends the typed word in `text`. */
+  answer: (attemptId: string, questionId: string, optionIds: string[], check: boolean, text = '') =>
+    api.put<ExerciseView>(`/attempts/${attemptId}/answers/${questionId}`, { option_ids: optionIds, text, check }),
   finish: (attemptId: string) => api.post<ExerciseView>(`/attempts/${attemptId}/finish`),
 };
 
@@ -196,8 +197,9 @@ export const previewApi = {
   resetLesson: (lid: string) => api.post<{ items: ExerciseView[] }>(`/preview/lessons/${lid}/reset`),
   view: (eid: string) => api.get<ExerciseView>(`/preview/exercises/${eid}`),
   start: (eid: string) => api.post<ExerciseView>(`/preview/exercises/${eid}/attempt`),
-  answer: (attemptId: string, questionId: string, optionIds: string[], check: boolean) =>
-    api.put<ExerciseView>(`/preview/attempts/${attemptId}/answers/${questionId}`, { option_ids: optionIds, check }),
+  /** A test answer sends option ids; a gap answer sends the typed word in `text`. */
+  answer: (attemptId: string, questionId: string, optionIds: string[], check: boolean, text = '') =>
+    api.put<ExerciseView>(`/preview/attempts/${attemptId}/answers/${questionId}`, { option_ids: optionIds, text, check }),
   finish: (attemptId: string) => api.post<ExerciseView>(`/preview/attempts/${attemptId}/finish`),
   reset: (attemptId: string) => api.post<ExerciseView>(`/preview/attempts/${attemptId}/reset`),
 };

@@ -11,6 +11,7 @@ const (
 	ScopeLesson   = "lesson"
 	ScopeHomework = "homework"
 	KindTest      = "test"
+	KindGaps      = "gaps" // «Слова и пропуски»: a phrase with one gap and the accepted word
 
 	CheckInstant = "instant" // checked while answering
 	CheckAfter   = "after"   // checked after the attempt is finished
@@ -43,6 +44,7 @@ type Settings struct {
 type Version struct {
 	ID         uuid.UUID  `json:"id"`
 	ExerciseID uuid.UUID  `json:"exercise_id"`
+	Kind       string     `json:"kind"`
 	Number     int        `json:"number"`
 	Title      string     `json:"title"`
 	Settings   Settings   `json:"settings"`
@@ -73,19 +75,43 @@ func (v *Version) MaxPoints() int {
 	return len(v.Questions) * v.Settings.PointsPerCorrect
 }
 
-// Sanitized returns a deep copy with the answer key removed.
+// Sanitized returns a deep copy with the answer key removed (what a kind hides is decided by its handler).
 func (v *Version) Sanitized() *Version {
+	h := v.handler()
 	c := *v
 	c.Questions = make([]Question, len(v.Questions))
 	for i, q := range v.Questions {
-		nq := q
-		nq.Options = make([]Option, len(q.Options))
-		for j, o := range q.Options {
-			nq.Options[j] = Option{ID: o.ID, Label: o.Label}
-		}
-		c.Questions[i] = nq
+		c.Questions[i] = h.Sanitize(q)
 	}
 	return &c
+}
+
+// Response is what a student gave for one question: chosen options (test) or a typed word (gaps).
+type Response struct {
+	Selected []uuid.UUID
+	Text     string
+}
+
+// Grade grades one question of this version by the exercise kind.
+func (v *Version) Grade(q Question, r Response) AnswerResult {
+	return v.handler().Grade(q, r)
+}
+
+// Question returns the question with the given id.
+func (v *Version) Question(id uuid.UUID) (Question, bool) {
+	for _, q := range v.Questions {
+		if q.ID == id {
+			return q, true
+		}
+	}
+	return Question{}, false
+}
+
+func (v *Version) handler() KindHandler {
+	if h, ok := handlerFor(v.Kind); ok {
+		return h
+	}
+	return testKind{}
 }
 
 type Exercise struct {

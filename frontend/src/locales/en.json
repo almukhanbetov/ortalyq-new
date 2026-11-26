@@ -240,7 +240,7 @@
   },
   "catalog": {
     "title": "Add exercise",
-    "hint": "Only the “Test” type works in this stage. Other types are listed for completeness and are not available yet.",
+    "hint": "At this stage «Test» and «Words and gaps» (one gap per phrase) work. Other types are listed for completeness and are not available yet.",
     "unavailable": "Unavailable",
     "groups": {
       "media": "Media",
@@ -319,7 +319,19 @@
     "deleteConfirmTitle": "Delete exercise?",
     "deleteConfirm": "The exercise disappears from the lesson. Student results stay in history.",
     "questionsCount": "Questions: {n}",
-    "fixErrors": "Fix the errors in the form"
+    "fixErrors": "Fix the errors in the form",
+    "titleNewGaps": "New «Words and gaps» exercise",
+    "titleEditGaps": "Edit «Words and gaps» exercise",
+    "gapPhrase": "Phrase with a gap",
+    "gapPhraseHint": "Mark the gap with three underscores: ___. One gap per phrase at this stage.",
+    "gapPhrasePlaceholder": "I ___ a student.",
+    "gapInsert": "Insert gap",
+    "gapAnswer": "Correct answer",
+    "gapAnswerHint": "The student’s answer is compared ignoring letter case and spaces around it.",
+    "gapAnswerPlaceholder": "am",
+    "gapPreview": "What the student sees",
+    "gapNoMarker": "Mark the gap: ___",
+    "gapManyMarkers": "Only one gap per phrase is supported for now"
   },
   "test": {
     "startTitle": "Timed test",
@@ -358,7 +370,12 @@
     "expired": "Time is up",
     "saveError": "Answer not saved: {msg}",
     "teacherSelected": "Student's choice",
-    "previewResetText": "Your preview attempt will be reset and the exercise can be taken again. Students' data will not change."
+    "previewResetText": "Your preview attempt will be reset and the exercise can be taken again. Students' data will not change.",
+    "gapHint": "Type the missing word",
+    "gapInput": "Gap: type the word",
+    "gapSaved": "Answer saved",
+    "gapStudentAnswer": "Student’s answer",
+    "gapNoAnswer": "no answer"
   },
   "homework": {
     "student": {

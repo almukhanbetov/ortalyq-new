@@ -10,6 +10,7 @@ import (
 
 type AnswerRequest struct {
 	OptionIDs []uuid.UUID `json:"option_ids"`
+	Text      string      `json:"text"` // gap exercises: the typed word
 	Check     bool        `json:"check"`
 }
 
@@ -20,9 +21,11 @@ type ResetRequest struct {
 type AnswerView struct {
 	QuestionID       uuid.UUID   `json:"question_id"`
 	Selected         []uuid.UUID `json:"selected"`
+	Text             string      `json:"text"` // gap exercises: the student's own typed word
 	Checked          bool        `json:"checked"`
-	Result           *string     `json:"result"`             // correct | wrong | unanswered, only when revealed
-	CorrectOptionIDs []uuid.UUID `json:"correct_option_ids"` // only when revealed
+	Result           *string     `json:"result"`                    // correct | wrong | unanswered, only when revealed
+	CorrectOptionIDs []uuid.UUID `json:"correct_option_ids"`        // only when revealed
+	CorrectAnswers   []string    `json:"correct_answers,omitempty"` // gap exercises: accepted words, only when revealed
 }
 
 type AttemptView struct {
