@@ -10,7 +10,7 @@ import { PageCard } from '@/components/layout/PageCard';
 import { exercisesApi, materialsApi } from '@/lib/api/endpoints';
 import { qk } from '@/lib/queryKeys';
 import { useT } from '@/lib/i18n';
-import { marathonFromParam, marathonUrl } from '@/lib/routes';
+import { marathonFromParam, marathonUrl, materialUrl } from '@/lib/routes';
 import { errorMessage, fieldErrors } from '@/lib/errors';
 import type { Exercise, Lesson, LessonAttrs, Scope, Section } from '@/types/api';
 import { CatalogModal } from '@/features/exercises/CatalogModal';
@@ -30,7 +30,7 @@ export function LessonEditor({ id }: { id: string }) {
     <QueryState query={lesson}>
       {(l) => (
         <PageCard>
-          <Link href={marathonId ? marathonUrl(marathonId, 'lessons') : `/materials/courses/${l.course_id}`} className="mb-4 inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink">
+          <Link href={marathonId ? marathonUrl(marathonId, 'lessons') : materialUrl(l.course_id)} className="mb-4 inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink">
             <ArrowLeft size={16} />{marathonId ? t('marathons.backToMarathon') : t('materials.backToCourse')}
           </Link>
           <LessonHeader lesson={l} />

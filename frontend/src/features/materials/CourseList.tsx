@@ -1,62 +1,144 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Plus } from 'lucide-react';
-import { Button, EmptyState, IconButton, QueryState } from '@/components/ui';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, ArrowRight, Plus, Search, SearchX } from 'lucide-react';
+import { Button, EmptyState, ErrorState, IconButton, Loading, cn } from '@/components/ui';
 import { PageCard } from '@/components/layout/PageCard';
 import { materialsApi } from '@/lib/api/endpoints';
 import { qk } from '@/lib/queryKeys';
 import { useT } from '@/lib/i18n';
-import { fieldErrors } from '@/lib/errors';
+import { materialUrl, materialsUrl } from '@/lib/routes';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { Cover } from '@/features/classrooms/Cover';
-import { TitleModal } from './TitleModal';
+import type { Course } from '@/types/api';
+import { MaterialModal, type MaterialFields } from './MaterialModal';
 import { MaterialsTabs } from './MaterialsTabs';
 
+// The API returns at most 100 per page; reordering needs the whole list, so personal materials load in one page.
+const LIMIT = 100;
+
+/**
+ * «Материалы» → «Личные материалы»: the teacher's own materials (courses with lessons).
+ * The address is the single source of truth for the search (?q=…); the server returns only the teacher's own materials.
+ */
 export function CourseList() {
   const t = useT();
   const qc = useQueryClient();
-  const [creating, setCreating] = useState(false);
-  const q = useQuery({ queryKey: qk.courses({}), queryFn: () => materialsApi.courses({ limit: 100 }) });
-  const create = useMutation({
-    mutationFn: ({ title, description }: { title: string; description: string }) => materialsApi.createCourse({ title, description }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['courses'] }); setCreating(false); },
+  const router = useRouter();
+  const params = useSearchParams();
+  const urlQ = params.get('q') ?? '';
+  const dq = urlQ.trim();
+  const [q, setQ] = useState(urlQ);
+  const pushed = useRef(urlQ);
+  const create = useDisclosure();
+
+  // Typing → URL (debounced); URL → input for back/forward (ignoring echoes of our own pushes).
+  useEffect(() => {
+    if (q.trim() === dq) return;
+    const id = setTimeout(() => { pushed.current = q.trim(); router.replace(materialsUrl({ q: q.trim() }), { scroll: false }); }, 250);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
+  useEffect(() => {
+    if (urlQ !== pushed.current) { pushed.current = urlQ; setQ(urlQ); }
+  }, [urlQ]);
+
+  const query = useQuery({
+    queryKey: qk.courses({ q: dq }),
+    queryFn: () => materialsApi.courses({ q: dq, limit: LIMIT }),
+    placeholderData: keepPreviousData,
+  });
+  const createM = useMutation({
+    mutationFn: (v: MaterialFields) => materialsApi.createCourse(v),
+    onSuccess: (c) => { qc.invalidateQueries({ queryKey: ['courses'] }); create.onClose(); router.push(materialUrl(c.id)); },
   });
   const reorder = useMutation({
     mutationFn: (ids: string[]) => materialsApi.reorderCourses(ids),
     onSettled: () => qc.invalidateQueries({ queryKey: ['courses'] }),
   });
 
+  const items = query.data?.items ?? [];
+  const total = query.data?.total ?? 0;
+  const empty = !query.isLoading && !query.error && items.length === 0;
+  const blank = empty && !dq;
+  // Order can be changed only on the full, unfiltered list (the server checks that every material is listed once).
+  const canReorder = !dq && items.length === total && items.length > 1;
+  const move = (i: number, d: -1 | 1) => {
+    const ids = items.map((x) => x.id);
+    [ids[i], ids[i + d]] = [ids[i + d], ids[i]];
+    reorder.mutate(ids);
+  };
+
   return (
-    <PageCard title={t('materials.title')} actions={<Button icon={<Plus size={18} />} onClick={() => setCreating(true)}>{t('materials.createCourse')}</Button>}>
+    <PageCard maxWidth={1024} className="pt-[18px] sm:pt-[18px] md:min-h-[calc(100dvh-64px-32px)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[30px] font-bold leading-9 text-ink-body">{t('materials.title')}</h1>
+        {!blank && <Button icon={<Plus size={18} />} onClick={create.onOpen}>{t('materials.createMaterial')}</Button>}
+      </div>
+
       <MaterialsTabs current="personal" />
-      <QueryState query={q}>
-        {(data) =>
-          data.items.length === 0 ? <EmptyState title={t('materials.noCourses')} /> : (
-            <ul className="flex flex-col gap-3">
-              {data.items.map((c, i) => (
-                <li key={c.id} className="flex items-center gap-4 rounded-xl border border-line p-3 hover:bg-surface-alt">
-                  <Cover color={c.cover_color} title={c.title} className="h-16 w-24 shrink-0 rounded-lg" />
-                  <Link href={`/materials/courses/${c.id}`} className="min-w-0 flex-1">
-                    <p className="truncate text-md font-medium text-ink">{c.title}</p>
-                    <p className="text-sm text-ink-muted">{t('picker.lessonsCount', { n: c.lesson_count })}</p>
-                  </Link>
-                  <div className="flex">
-                    <IconButton label={t('common.moveUp')} disabled={i === 0 || reorder.isPending}
-                      onClick={() => { const ids = data.items.map((x) => x.id); [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; reorder.mutate(ids); }}><ArrowUp size={16} /></IconButton>
-                    <IconButton label={t('common.moveDown')} disabled={i === data.items.length - 1 || reorder.isPending}
-                      onClick={() => { const ids = data.items.map((x) => x.id); [ids[i + 1], ids[i]] = [ids[i], ids[i + 1]]; reorder.mutate(ids); }}><ArrowDown size={16} /></IconButton>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )
-        }
-      </QueryState>
-      <TitleModal open={creating} onClose={() => setCreating(false)} title={t('materials.createCourse')} label={t('materials.courseTitle')}
-        withDescription={t('materials.courseDescription')} loading={create.isPending} error={fieldErrors(create.error).title}
-        onSubmit={(title, description) => create.mutate({ title, description })} />
+
+      <div className="relative mt-5">
+        <Search size={20} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint" aria-hidden />
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('materials.searchPlaceholder')} aria-label={t('materials.searchPlaceholder')}
+          className="h-10 w-full rounded-lg border border-line-soft bg-surface pl-10 pr-3 text-md text-ink-body placeholder:text-ink-faint focus:border-primary focus:outline-none focus:shadow-focus" />
+      </div>
+
+      {!blank && !query.isLoading && !query.error && (
+        <div className="mb-[21px] mt-[18px] flex items-center gap-3">
+          <p className="shrink-0 text-md text-ink-faint" aria-live="polite">{t('materials.count', { n: total })}</p>
+          <span className="h-0 flex-1 border-t-2 border-dotted border-line-soft" aria-hidden />
+        </div>
+      )}
+
+      {query.isLoading ? <Loading /> : query.error ? <ErrorState error={query.error} onRetry={() => query.refetch()} /> : blank ? (
+        <div className="mt-4 flex min-h-[420px] flex-col items-center justify-center rounded-lg border border-surface-muted px-4 py-10 text-center">
+          <span className="text-[64px] leading-none" aria-hidden>📚</span>
+          <p className="mt-[22px] max-w-md text-[20px] leading-7 text-ink-soft">{t('materials.empty')}</p>
+          <Button className="mt-[22px]" icon={<Plus size={18} />} onClick={create.onOpen}>{t('materials.createMaterial')}</Button>
+        </div>
+      ) : empty ? (
+        <EmptyState icon={<SearchX size={26} />} title={t('materials.noResults')} text={t('materials.noResultsHint')}
+          action={<Button variant="secondary" onClick={() => setQ('')}>{t('materials.resetSearch')}</Button>} />
+      ) : (
+        <ul className={cn('grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2 lg:grid-cols-3', query.isFetching && 'opacity-70')}>
+          {items.map((c, i) => (
+            <MaterialCard key={c.id} c={c}
+              order={canReorder ? { first: i === 0, last: i === items.length - 1, busy: reorder.isPending, move: (d) => move(i, d) } : undefined} />
+          ))}
+        </ul>
+      )}
+
+      <MaterialModal open={create.open} onClose={create.onClose} heading={t('materials.createMaterial')}
+        loading={createM.isPending} error={createM.error} onSubmit={(v) => createM.mutate(v)} />
     </PageCard>
+  );
+}
+
+function MaterialCard({ c, order }: { c: Course; order?: { first: boolean; last: boolean; busy: boolean; move: (d: -1 | 1) => void } }) {
+  const t = useT();
+  return (
+    <li className="group relative flex flex-col overflow-hidden rounded-xl border border-line-soft bg-surface transition-shadow hover:shadow-card">
+      <Cover color={c.cover_color} title={c.title} className="aspect-[16/9] w-full" />
+      <div className="flex flex-1 flex-col gap-1 p-4">
+        <h2 className="line-clamp-2 text-md font-bold text-ink-body">
+          {/* The stretched link makes the whole card clickable; the order buttons sit above it. */}
+          <Link href={materialUrl(c.id)} className="after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:rounded-xl focus-visible:after:shadow-focus">{c.title}</Link>
+        </h2>
+        {c.description && <p className="line-clamp-2 text-sm text-ink-muted">{c.description}</p>}
+        <div className="mt-auto flex items-center justify-between pt-2">
+          <span className="text-sm text-ink-faint">{t('picker.lessonsCount', { n: c.lesson_count })}</span>
+          {order && (
+            <span className="relative z-10 flex">
+              <IconButton label={t('materials.moveEarlier')} disabled={order.first || order.busy} onClick={() => order.move(-1)}><ArrowLeft size={16} /></IconButton>
+              <IconButton label={t('materials.moveLater')} disabled={order.last || order.busy} onClick={() => order.move(1)}><ArrowRight size={16} /></IconButton>
+            </span>
+          )}
+        </div>
+      </div>
+    </li>
   );
 }

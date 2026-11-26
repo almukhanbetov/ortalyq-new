@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { BookOpen, CalendarDays, CreditCard, Globe, GraduationCap, Hand, Settings, ShieldCheck, Users } from 'lucide-react';
 import type { Role } from '@/types/api';
-import { CLASSES_ROUTE, MARATHONS_ROUTE } from '@/lib/routes';
+import { CLASSES_ROUTE, MARATHONS_ROUTE, MATERIALS_ROUTE } from '@/lib/routes';
 
 export interface CabinetNavItem { href: string; key: string; icon: ReactNode; roles: Role[]; /** extra paths that also mark the item active */ also?: string[] }
 
@@ -12,7 +12,7 @@ export const CABINET_NAV: CabinetNavItem[] = [
   { href: '/welcome', key: 'welcome', icon: <Hand size={ICON} />, roles: ['teacher', 'private_teacher', 'student', 'admin'] },
   { href: CLASSES_ROUTE, key: 'classes', icon: <GraduationCap size={ICON} />, roles: ['teacher', 'private_teacher', 'student'], also: [MARATHONS_ROUTE] },
   { href: '/students', key: 'students', icon: <Users size={ICON} />, roles: ['teacher'] },
-  { href: '/materials', key: 'materials', icon: <BookOpen size={ICON} />, roles: ['teacher', 'private_teacher'] },
+  { href: MATERIALS_ROUTE, key: 'materials', icon: <BookOpen size={ICON} />, roles: ['teacher', 'private_teacher'] },
   { href: '/schedule', key: 'schedule', icon: <CalendarDays size={ICON} />, roles: ['teacher', 'private_teacher', 'student'] },
   { href: '/site', key: 'site', icon: <Globe size={ICON} />, roles: ['teacher', 'private_teacher'] },
   { href: '/pricing', key: 'pricing', icon: <CreditCard size={ICON} />, roles: ['teacher', 'private_teacher'] },

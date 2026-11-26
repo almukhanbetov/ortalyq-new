@@ -113,6 +113,7 @@ func (s *Service) CreateCourse(ctx context.Context, p auth.Principal, req Course
 	desc, color := "", "#1AC6FF"
 	if req.Description != nil {
 		desc = strings.TrimSpace(*req.Description)
+		v.Check(len([]rune(desc)) <= 5000, "description", "Слишком длинное описание")
 	}
 	if req.CoverColor != nil {
 		v.Check(colorRe.MatchString(*req.CoverColor), "cover_color", "Некорректный цвет")
@@ -136,7 +137,7 @@ func (s *Service) UpdateCourse(ctx context.Context, p auth.Principal, id uuid.UU
 	if req.Description != nil {
 		d := strings.TrimSpace(*req.Description)
 		req.Description = &d
-		v.Check(len(d) <= 5000, "description", "Слишком длинное описание")
+		v.Check(len([]rune(d)) <= 5000, "description", "Слишком длинное описание")
 	}
 	if err := v.Err(); err != nil {
 		return nil, err

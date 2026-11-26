@@ -66,6 +66,18 @@ export function marathonLessonUrl(id: string, lessonId: string) {
   return `${MARATHONS_ROUTE}/${id}/lesson/${lessonId}`;
 }
 
+/** «Материалы» → «Личные материалы»: the teacher's own materials (courses). The search is kept in the address (?q=…). */
+export const MATERIALS_ROUTE = '/materials';
+
+export function materialsUrl(params: { q?: string } = {}) {
+  return params.q ? `${MATERIALS_ROUTE}?q=${encodeURIComponent(params.q)}` : MATERIALS_ROUTE;
+}
+
+/** One material with its lessons. */
+export function materialUrl(id: string) {
+  return `${MATERIALS_ROUTE}/courses/${id}`;
+}
+
 /** Lesson editor in materials. With a marathon id the editor offers "back to the marathon" instead of the course. */
 export function lessonEditorUrl(lessonId: string, marathonId?: string) {
   const base = `/materials/lessons/${lessonId}`;
@@ -82,13 +94,6 @@ export function marathonFromParam(v: string | null): string | null {
 /** Where a class card leads: marathons have their own page, other classes open the classroom. */
 export function classUrl(c: { id: string; lesson_type: string }) {
   return c.lesson_type === 'marathon' ? marathonUrl(c.id) : `/classes/${c.id}`;
-}
-
-/** «Материалы» → «Личные материалы»: the teacher's own materials (courses). The search is kept in the address (?q=…). */
-export const MATERIALS_ROUTE = '/materials';
-
-export function materialsUrl(params: { q?: string } = {}) {
-  return params.q ? `${MATERIALS_ROUTE}?q=${encodeURIComponent(params.q)}` : MATERIALS_ROUTE;
 }
 
 /** «Материалы» → «Интерактивные доски»: the teacher's personal boards. The search is kept in the address. */

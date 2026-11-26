@@ -17,7 +17,7 @@ try {
   p.on('pageerror', (e) => errors.push(e.message));
   await p.goto(`${WEB}/login`);
   await p.getByLabel('Email').fill('teacher@ortalyq.local');
-  await p.getByLabel('Пароль').fill(process.env.TEACHER_PASSWORD || 'teacher-local-123');
+  await p.getByLabel('Пароль', { exact: true }).fill(process.env.TEACHER_PASSWORD || 'teacher-local-123');
   await p.getByRole('button', { name: 'Войти' }).click();
   await p.waitForURL(/\/classes/);
   await p.evaluate(() => localStorage.removeItem('ortalyq_sidebar_pinned'));
@@ -76,7 +76,7 @@ try {
 
   // Click on a menu item with the mouse, then leave: must collapse (no sticky focus).
   await side.getByRole('link', { name: 'Материалы' }).click();
-  await p.getByRole('heading', { name: 'Учебные материалы' }).waitFor();
+  await p.getByRole('heading', { name: 'Материалы', exact: true }).waitFor();
   await p.mouse.move(900, 500);
   await p.waitForTimeout(500);
   assert((await width()) === 64, 'collapses after mouse click + leave');
@@ -197,7 +197,7 @@ try {
   const ap = await a.newPage();
   await ap.goto(`${WEB}/login`);
   await ap.getByLabel('Email').fill('admin@ortalyq.local');
-  await ap.getByLabel('Пароль').fill(process.env.ADMIN_PASSWORD || 'admin-local-123');
+  await ap.getByLabel('Пароль', { exact: true }).fill(process.env.ADMIN_PASSWORD || 'admin-local-123');
   await ap.getByRole('button', { name: 'Войти' }).click();
   await ap.waitForURL(/\/admin/);
   await ap.evaluate(() => localStorage.setItem('ortalyq_sidebar_pinned', '0'));
