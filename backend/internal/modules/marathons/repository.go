@@ -257,9 +257,11 @@ func (r *Repository) CopyLesson(ctx context.Context, classroomID, ownerID, srcID
 				newID, e.scope, section, e.kind, e.position, e.hidden, e.id, ownerID).Scan(&exID); err != nil {
 				return err
 			}
+			// file_id: a PDF block of the copy shows the same stored file; it is served through the copy's own
+			// exercise, so the copy's access rules apply to it.
 			if err := tx.QueryRow(ctx, `INSERT INTO exercise_versions (exercise_id, version, title, check_mode, timer_enabled,
-					timer_seconds, scoring_enabled, points_per_correct, category_id, created_by)
-				SELECT $2, 1, title, check_mode, timer_enabled, timer_seconds, scoring_enabled, points_per_correct, category_id, $3
+					timer_seconds, scoring_enabled, points_per_correct, category_id, created_by, file_id)
+				SELECT $2, 1, title, check_mode, timer_enabled, timer_seconds, scoring_enabled, points_per_correct, category_id, $3, file_id
 				FROM exercise_versions WHERE id = $1 RETURNING id`, e.versionID, exID, ownerID).Scan(&verID); err != nil {
 				return err
 			}

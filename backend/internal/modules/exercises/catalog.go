@@ -5,6 +5,7 @@ package exercises
 var Catalog = []CatalogEntry{
 	{Kind: "image", Group: "media", Available: false},
 	{Kind: "audio_video", Group: "media", Available: false},
+	{Kind: KindPDF, Group: "media", Available: true},
 	{Kind: KindGaps, Group: "words", Available: true},
 	{Kind: KindTest, Group: "check", Available: true},
 	{Kind: "true_false", Group: "check", Available: false},
@@ -26,7 +27,7 @@ type KindHandler interface {
 	Sanitize(q Question) Question
 }
 
-var kinds = map[string]KindHandler{KindTest: testKind{}, KindGaps: gapsKind{}, KindText: textKind{}}
+var kinds = map[string]KindHandler{KindTest: testKind{}, KindGaps: gapsKind{}, KindText: textKind{}, KindPDF: pdfKind{}}
 
 func handlerFor(kind string) (KindHandler, bool) {
 	h, ok := kinds[kind]

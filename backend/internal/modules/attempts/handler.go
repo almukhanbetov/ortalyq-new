@@ -7,11 +7,18 @@ import (
 
 	"ortalyq/backend/internal/httpx"
 	"ortalyq/backend/internal/modules/auth"
+	"ortalyq/backend/internal/modules/uploads"
 )
 
-type Handler struct{ svc *Service }
+type Handler struct {
+	svc *Service
+	// frameAncestors are the web app origins that may show a PDF inside the page.
+	frameAncestors []string
+}
 
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+func NewHandler(svc *Service, frameAncestors []string) *Handler {
+	return &Handler{svc: svc, frameAncestors: frameAncestors}
+}
 
 func principal(c *gin.Context) auth.Principal { p, _ := auth.PrincipalFrom(c); return p }
 
@@ -192,4 +199,22 @@ func (h *Handler) PreviewResetAttempt(c *gin.Context) {
 	}
 	v, err := h.svc.PreviewResetAttempt(c.Request.Context(), principal(c), aid)
 	reply(c, v, err)
+}
+
+// File serves the PDF of a «PDF-документ» block to a member of the class who may see the block.
+func (h *Handler) File(c *gin.Context) {
+	cid, ok := httpx.UUIDParam(c, "cid")
+	if !ok {
+		return
+	}
+	eid, ok := httpx.UUIDParam(c, "eid")
+	if !ok {
+		return
+	}
+	file, f, err := h.svc.ClassFile(c.Request.Context(), principal(c), cid, eid)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	uploads.ServePDF(c, f, file.Name, file.CreatedAt, h.frameAncestors)
 }

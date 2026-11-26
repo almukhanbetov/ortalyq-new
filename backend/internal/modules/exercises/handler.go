@@ -1,17 +1,27 @@
 package exercises
 
 import (
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
+	"ortalyq/backend/internal/apperr"
 	"ortalyq/backend/internal/httpx"
 	"ortalyq/backend/internal/modules/auth"
+	"ortalyq/backend/internal/modules/uploads"
 )
 
-type Handler struct{ svc *Service }
+type Handler struct {
+	svc *Service
+	// frameAncestors are the web app origins that may show a PDF inside the page.
+	frameAncestors []string
+}
 
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+func NewHandler(svc *Service, frameAncestors []string) *Handler {
+	return &Handler{svc: svc, frameAncestors: frameAncestors}
+}
 
 func principal(c *gin.Context) auth.Principal { p, _ := auth.PrincipalFrom(c); return p }
 
@@ -136,4 +146,46 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 	}
 	cat, err := h.svc.CreateCategory(c.Request.Context(), principal(c), req)
 	respond(c, http.StatusCreated, cat, err)
+}
+
+// UploadFile takes the PDF of a «PDF-документ» block (multipart field "file").
+func (h *Handler) UploadFile(c *gin.Context) {
+	id, ok := httpx.UUIDParam(c, "id")
+	if !ok {
+		return
+	}
+	// The body is cut a little above the limit; the upload service checks the exact size and the content.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, uploads.PDFMaxBytes+1<<20)
+	fh, err := c.FormFile("file")
+	if err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) || strings.Contains(err.Error(), "too large") {
+			httpx.Fail(c, uploads.ErrPDFTooLarge())
+			return
+		}
+		httpx.Fail(c, apperr.Validation(map[string]string{"file": "Прикрепите PDF-файл"}))
+		return
+	}
+	f, err := fh.Open()
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	defer f.Close()
+	file, err := h.svc.UploadFile(c.Request.Context(), principal(c), id, fh.Filename, fh.Size, f)
+	respond(c, http.StatusCreated, file, err)
+}
+
+// File serves the PDF of a block to the owner of its lesson.
+func (h *Handler) File(c *gin.Context) {
+	id, ok := httpx.UUIDParam(c, "id")
+	if !ok {
+		return
+	}
+	file, f, err := h.svc.OpenFile(c.Request.Context(), principal(c), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	uploads.ServePDF(c, f, file.Name, file.CreatedAt, h.frameAncestors)
 }

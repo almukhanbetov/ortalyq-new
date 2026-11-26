@@ -13,6 +13,7 @@ const (
 	KindTest      = "test"
 	KindGaps      = "gaps" // «Слова и пропуски»: a phrase with one gap and the accepted word
 	KindText      = "text" // «Текст»: a read-only block for reading and speaking, no answer and no grade
+	KindPDF       = "pdf"  // «PDF-документ»: a read-only block that shows a PDF file, no answer and no grade
 
 	CheckInstant = "instant" // checked while answering
 	CheckAfter   = "after"   // checked after the attempt is finished
@@ -50,7 +51,20 @@ type Version struct {
 	Title      string     `json:"title"`
 	Settings   Settings   `json:"settings"`
 	Questions  []Question `json:"questions"`
-	CreatedAt  time.Time  `json:"created_at"`
+	// File is the PDF of a «PDF-документ» block (nil for other kinds). The file itself is served only through the
+	// exercise (see Service.OpenFile), never by its own id.
+	File      *File     `json:"file"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// File is a PDF stored for a lesson block.
+type File struct {
+	ID         uuid.UUID  `json:"id"`
+	OwnerID    *uuid.UUID `json:"-"`
+	Name       string     `json:"name"`
+	SizeBytes  int64      `json:"size_bytes"`
+	StoredName string     `json:"-"`
+	CreatedAt  time.Time  `json:"-"`
 }
 
 // CorrectSet returns the correct option ids per question.

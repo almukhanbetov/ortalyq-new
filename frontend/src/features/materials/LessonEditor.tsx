@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlignLeft, ArrowDown, ArrowLeft, ArrowUp, Copy, Eye, EyeOff, ListChecks, MoreHorizontal, Pencil, PencilLine, Plus, Settings2, Trash2 } from 'lucide-react';
+import { AlignLeft, ArrowDown, ArrowLeft, ArrowUp, Copy, Eye, EyeOff, FileText, ListChecks, MoreHorizontal, Pencil, PencilLine, Plus, Settings2, Trash2 } from 'lucide-react';
 import { Badge, Button, ConfirmDialog, EmptyState, Field, IconButton, Input, Menu, QueryState, Tabs, useToast } from '@/components/ui';
 import { PageCard } from '@/components/layout/PageCard';
 import { exercisesApi, materialsApi } from '@/lib/api/endpoints';
@@ -15,6 +15,7 @@ import { errorMessage, fieldErrors } from '@/lib/errors';
 import type { Exercise, Lesson, LessonAttrs, Scope, Section } from '@/types/api';
 import { CatalogModal } from '@/features/exercises/CatalogModal';
 import { ExerciseEditorModal, isExerciseKind, type EditorTarget } from '@/features/exercises/ExerciseEditorModal';
+import { PdfViewer } from '@/features/exercises/PdfBlock';
 import { TitleModal } from './TitleModal';
 
 export function LessonEditor({ id }: { id: string }) {
@@ -210,25 +211,28 @@ function ExerciseRows({ items, lessonId, scope, sectionId, onEdit, emptyText }: 
     <>
       <ul className="flex flex-col gap-2">
         {items.map((e, i) => (
-          <li key={e.id} className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-text">{e.kind === 'gaps' ? <PencilLine size={18} /> : e.kind === 'text' ? <AlignLeft size={18} /> : <ListChecks size={18} />}</span>
-            <button type="button" onClick={() => onEdit(e)} className="min-w-0 flex-1 text-left">
-              <p className="truncate font-medium text-ink hover:text-primary-text">{e.version.title}</p>
-              <p className="text-xs text-ink-muted">
-                {t(`catalog.types.${e.kind}`)} · {e.kind === 'gaps' ? e.version.questions[0]?.prompt : e.kind === 'text' ? textSnippet(e.version.questions[0]?.prompt) : t('editor.questionsCount', { n: e.version.questions.length })} · v{e.version.number}
-                {e.copied_from_id ? ` · ${t('materials.copiedFrom')}` : ''}
-              </p>
-            </button>
-            {e.hidden && <Badge icon={<EyeOff size={12} />}>{t('classroom.hiddenBadge')}</Badge>}
-            {e.version.settings.scoring_enabled && <Badge tone="primary">{e.version.settings.category_name}</Badge>}
-            <Menu label={t('chat.menu')} items={[
-              { key: 'edit', label: t('common.edit'), icon: <Pencil size={16} />, onSelect: () => onEdit(e) },
-              { key: 'hide', label: e.hidden ? t('editor.show') : t('editor.hide'), icon: e.hidden ? <Eye size={16} /> : <EyeOff size={16} />, onSelect: () => hide.mutate(e) },
-              ...(scope === 'lesson' && e.kind !== 'text' ? [{ key: 'copy', label: t('editor.copyToHomework'), icon: <Copy size={16} />, onSelect: () => copy.mutate(e) }] : []),
-              { key: 'up', label: t('common.moveUp'), icon: <ArrowUp size={16} />, disabled: i === 0, onSelect: () => move(i, -1) },
-              { key: 'down', label: t('common.moveDown'), icon: <ArrowDown size={16} />, disabled: i === items.length - 1, onSelect: () => move(i, 1) },
-              { key: 'del', label: t('common.delete'), icon: <Trash2 size={16} />, tone: 'danger', onSelect: () => setDeleting(e) },
-            ]} trigger={(p) => <IconButton {...p} label={t('chat.menu')}><MoreHorizontal size={18} /></IconButton>} />
+          <li key={e.id} className="rounded-lg border border-line bg-surface px-3 py-2.5" data-kind={e.kind}>
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-text">{e.kind === 'gaps' ? <PencilLine size={18} /> : e.kind === 'text' ? <AlignLeft size={18} /> : e.kind === 'pdf' ? <FileText size={18} /> : <ListChecks size={18} />}</span>
+              <button type="button" onClick={() => onEdit(e)} className="min-w-0 flex-1 text-left">
+                <p className="truncate font-medium text-ink hover:text-primary-text">{e.version.title}</p>
+                <p className="text-xs text-ink-muted">
+                  {t(`catalog.types.${e.kind}`)} · {e.kind === 'gaps' ? e.version.questions[0]?.prompt : e.kind === 'text' ? textSnippet(e.version.questions[0]?.prompt) : e.kind === 'pdf' ? e.version.file?.name : t('editor.questionsCount', { n: e.version.questions.length })} · v{e.version.number}
+                  {e.copied_from_id ? ` · ${t('materials.copiedFrom')}` : ''}
+                </p>
+              </button>
+              {e.hidden && <Badge icon={<EyeOff size={12} />}>{t('classroom.hiddenBadge')}</Badge>}
+              {e.version.settings.scoring_enabled && <Badge tone="primary">{e.version.settings.category_name}</Badge>}
+              <Menu label={t('chat.menu')} items={[
+                { key: 'edit', label: t('common.edit'), icon: <Pencil size={16} />, onSelect: () => onEdit(e) },
+                { key: 'hide', label: e.hidden ? t('editor.show') : t('editor.hide'), icon: e.hidden ? <Eye size={16} /> : <EyeOff size={16} />, onSelect: () => hide.mutate(e) },
+                ...(scope === 'lesson' && e.kind !== 'text' && e.kind !== 'pdf' ? [{ key: 'copy', label: t('editor.copyToHomework'), icon: <Copy size={16} />, onSelect: () => copy.mutate(e) }] : []),
+                { key: 'up', label: t('common.moveUp'), icon: <ArrowUp size={16} />, disabled: i === 0, onSelect: () => move(i, -1) },
+                { key: 'down', label: t('common.moveDown'), icon: <ArrowDown size={16} />, disabled: i === items.length - 1, onSelect: () => move(i, 1) },
+                { key: 'del', label: t('common.delete'), icon: <Trash2 size={16} />, tone: 'danger', onSelect: () => setDeleting(e) },
+              ]} trigger={(p) => <IconButton {...p} label={t('chat.menu')}><MoreHorizontal size={18} /></IconButton>} />
+            </div>
+            {e.kind === 'pdf' && e.version.file && <PdfViewer className="mt-3" url={exercisesApi.fileUrl(e.id)} title={e.version.title} file={e.version.file} />}
           </li>
         ))}
       </ul>

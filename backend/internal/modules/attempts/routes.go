@@ -9,6 +9,7 @@ import (
 func (h *Handler) Register(authed *gin.RouterGroup) {
 	authed.GET("/classrooms/:cid/lessons/:lid/exercises", h.LessonExercises)
 	authed.GET("/classrooms/:cid/exercises/:eid", h.View)
+	authed.GET("/classrooms/:cid/exercises/:eid/file", h.File)
 	authed.POST("/classrooms/:cid/exercises/:eid/attempt", h.Start)
 	authed.POST("/classrooms/:cid/exercises/:eid/reset", h.Reset)
 	authed.PUT("/attempts/:aid/answers/:qid", h.Answer)

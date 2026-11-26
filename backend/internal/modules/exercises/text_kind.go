@@ -41,8 +41,11 @@ func (textKind) Grade(Question, Response) AnswerResult { return Unanswered }
 
 func (textKind) Sanitize(q Question) Question { return q }
 
-// Gradable tells whether students answer this kind (attempts, points, progress). Text blocks are read only.
-func Gradable(kind string) bool { return kind != KindText }
+// Gradable tells whether students answer this kind (attempts, points, progress). Text and PDF blocks are read only.
+func Gradable(kind string) bool { return kind != KindText && kind != KindPDF }
+
+// LessonOnly tells whether a kind lives only in lesson sections (read-only blocks have nothing to send as homework).
+func LessonOnly(kind string) bool { return !Gradable(kind) }
 
 // OnlyGradable drops read-only blocks from a list of exercises.
 func OnlyGradable(list []Exercise) []Exercise {

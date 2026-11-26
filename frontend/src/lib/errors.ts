@@ -16,7 +16,7 @@ export function errorMessage(err: unknown, t: TFunction): string {
     if (err.code === 'marathon_lesson_locked') return t('errors.marathon_lesson_locked');
     if (err.code === 'lesson_dates_set') return t('errors.lesson_dates_set');
     if (err.code === 'settings_changed') return t('errors.settings_changed');
-    if (err.code === 'image_type' || err.code === 'image_size' || err.code === 'file_too_large') return t(`errors.${err.code}`);
+    if (err.code === 'image_type' || err.code === 'image_size' || err.code === 'file_too_large' || err.code === 'pdf_type') return t(`errors.${err.code}`);
     if (err.status === 404) return t('errors.not_found');
     const fieldMsgs = Object.values(err.fields);
     if (fieldMsgs.length) return fieldMsgs.join('. ');

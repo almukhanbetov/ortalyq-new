@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, Clock, EyeOff, Lock, RotateCcw, Timer, X } from 'lucide-react';
 import { Badge, Button, ChoiceMark, ConfirmDialog, Notice, cn, useToast } from '@/components/ui';
-import { attemptsApi, previewApi } from '@/lib/api/endpoints';
+import { attemptsApi, exercisesApi, previewApi } from '@/lib/api/endpoints';
 import { ApiError } from '@/lib/api/client';
 import { formatDuration } from '@/lib/format';
 import { useT } from '@/lib/i18n';
@@ -12,6 +12,7 @@ import { errorMessage } from '@/lib/errors';
 import type { AnswerView, ExerciseView, Question } from '@/types/api';
 import { GapQuestion } from './GapQuestion';
 import { TextBlock } from './TextBlock';
+import { PdfBlock } from './PdfBlock';
 
 /** Replaces an exercise view in every cached lesson list of this classroom. */
 export function useExerciseCache(classroomId: string) {
@@ -61,9 +62,14 @@ interface Props {
   onChecked?: (correct: boolean) => void;
 }
 
-/** One exercise of an open lesson: a read-only text block, or a test / gaps exercise the student answers. */
+/** One exercise of an open lesson: a read-only text or PDF block, or a test / gaps exercise the student answers. */
 export function TestPlayer(props: Props) {
   if (props.view.kind === 'text') return <TextBlock view={props.view} teacher={props.role === 'teacher'} index={props.index} />;
+  if (props.view.kind === 'pdf') {
+    // In the teacher preview the file comes through the lesson owner's route, in a class through the class.
+    const url = props.preview ? exercisesApi.fileUrl(props.view.exercise_id) : attemptsApi.fileUrl(props.classroomId, props.view.exercise_id);
+    return <PdfBlock view={props.view} teacher={props.role === 'teacher'} index={props.index} url={url} />;
+  }
   return <QuestionPlayer {...props} />;
 }
 

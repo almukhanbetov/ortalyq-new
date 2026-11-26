@@ -22,10 +22,10 @@ func insertVersion(ctx context.Context, tx pgx.Tx, exerciseID uuid.UUID, by uuid
 	s := req.Settings
 	var vid uuid.UUID
 	err := tx.QueryRow(ctx, `INSERT INTO exercise_versions (exercise_id, version, title, check_mode, timer_enabled, timer_seconds,
-		scoring_enabled, points_per_correct, category_id, created_by)
+		scoring_enabled, points_per_correct, category_id, created_by, file_id)
 		VALUES ($1, (SELECT COALESCE(max(version), 0) + 1 FROM exercise_versions WHERE exercise_id = $1),
-		$2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-		exerciseID, strings.TrimSpace(req.Title), s.CheckMode, s.TimerEnabled, s.TimerSeconds, s.ScoringEnabled, s.PointsPerCorrect, s.CategoryID, by).Scan(&vid)
+		$2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+		exerciseID, strings.TrimSpace(req.Title), s.CheckMode, s.TimerEnabled, s.TimerSeconds, s.ScoringEnabled, s.PointsPerCorrect, s.CategoryID, by, req.FileID).Scan(&vid)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -138,19 +138,27 @@ func (r *Repository) LoadVersions(ctx context.Context, ids []uuid.UUID) (map[uui
 		return out, nil
 	}
 	rows, err := r.pool.Query(ctx, `SELECT v.id, v.exercise_id, e.kind, v.version, v.title, v.check_mode, v.timer_enabled, v.timer_seconds,
-		v.scoring_enabled, v.points_per_correct, v.category_id, COALESCE(c.name, ''), v.created_at
+		v.scoring_enabled, v.points_per_correct, v.category_id, COALESCE(c.name, ''), v.created_at,
+		f.id, f.original_name, f.size_bytes
 		FROM exercise_versions v JOIN exercises e ON e.id = v.exercise_id
-		LEFT JOIN score_categories c ON c.id = v.category_id WHERE v.id = ANY($1)`, ids)
+		LEFT JOIN score_categories c ON c.id = v.category_id
+		LEFT JOIN lesson_files f ON f.id = v.file_id WHERE v.id = ANY($1)`, ids)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		var v Version
 		s := &v.Settings
+		var fileID *uuid.UUID
+		var fileName *string
+		var fileSize *int64
 		if err := rows.Scan(&v.ID, &v.ExerciseID, &v.Kind, &v.Number, &v.Title, &s.CheckMode, &s.TimerEnabled, &s.TimerSeconds,
-			&s.ScoringEnabled, &s.PointsPerCorrect, &s.CategoryID, &s.CategoryName, &v.CreatedAt); err != nil {
+			&s.ScoringEnabled, &s.PointsPerCorrect, &s.CategoryID, &s.CategoryName, &v.CreatedAt, &fileID, &fileName, &fileSize); err != nil {
 			rows.Close()
 			return nil, err
+		}
+		if fileID != nil {
+			v.File = &File{ID: *fileID, Name: *fileName, SizeBytes: *fileSize}
 		}
 		v.Questions = []Question{}
 		out[v.ID] = &v
@@ -268,4 +276,33 @@ func (r *Repository) QuestionStats(ctx context.Context, versionID uuid.UUID) (at
 	}
 	err = rows.Err()
 	return
+}
+
+// ---------- lesson files («PDF-документ») ----------
+
+const fileCols = `id, owner_id, original_name, stored_name, size_bytes, created_at`
+
+func scanFile(row pgx.Row) (*File, error) {
+	var f File
+	if err := row.Scan(&f.ID, &f.OwnerID, &f.Name, &f.StoredName, &f.SizeBytes, &f.CreatedAt); err != nil {
+		return nil, err
+	}
+	return &f, nil
+}
+
+// InsertFile records a checked PDF uploaded by the owner.
+func (r *Repository) InsertFile(ctx context.Context, owner uuid.UUID, name, stored, mime string, size int64) (*File, error) {
+	return scanFile(r.pool.QueryRow(ctx, `INSERT INTO lesson_files (owner_id, original_name, stored_name, mime_type, size_bytes)
+		VALUES ($1, $2, $3, $4, $5) RETURNING `+fileCols, owner, name, stored, mime, size))
+}
+
+// File returns a lesson file by id.
+func (r *Repository) File(ctx context.Context, id uuid.UUID) (*File, error) {
+	return scanFile(r.pool.QueryRow(ctx, `SELECT `+fileCols+` FROM lesson_files WHERE id = $1`, id))
+}
+
+// VersionFile returns the file of a version, or pgx.ErrNoRows when the version has none.
+func (r *Repository) VersionFile(ctx context.Context, versionID uuid.UUID) (*File, error) {
+	return scanFile(r.pool.QueryRow(ctx, `SELECT f.id, f.owner_id, f.original_name, f.stored_name, f.size_bytes, f.created_at
+		FROM exercise_versions v JOIN lesson_files f ON f.id = v.file_id WHERE v.id = $1`, versionID))
 }

@@ -2,6 +2,8 @@ package exercises
 
 import (
 	"context"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/google/uuid"
@@ -10,6 +12,7 @@ import (
 	"ortalyq/backend/internal/database"
 	"ortalyq/backend/internal/modules/auth"
 	"ortalyq/backend/internal/modules/materials"
+	"ortalyq/backend/internal/modules/uploads"
 )
 
 type Lessons interface {
@@ -21,14 +24,22 @@ type Notifier interface {
 	LessonChanged(ctx context.Context, lessonID uuid.UUID)
 }
 
+// FileStore checks and stores PDF files of lesson blocks (uploads.Service).
+type FileStore interface {
+	StorePDF(size int64, r io.Reader) (*uploads.StoredFile, error)
+	OpenStored(name string) (*os.File, error)
+	RemoveStored(name string)
+}
+
 type Service struct {
 	repo    *Repository
 	lessons Lessons
 	notify  Notifier
+	files   FileStore
 }
 
-func NewService(repo *Repository, lessons Lessons, notify Notifier) *Service {
-	return &Service{repo: repo, lessons: lessons, notify: notify}
+func NewService(repo *Repository, lessons Lessons, notify Notifier, files FileStore) *Service {
+	return &Service{repo: repo, lessons: lessons, notify: notify, files: files}
 }
 
 func (s *Service) Catalog() []CatalogEntry { return Catalog }
@@ -50,13 +61,25 @@ func CheckContent(kind string, req SaveRequest) map[string]string {
 	return errs
 }
 
-func (s *Service) validate(ctx context.Context, p auth.Principal, kind string, req *SaveRequest) error {
+// validate checks a save request. current is the exercise being changed (nil when creating): a PDF block may keep
+// its current file, any other file must be uploaded by the teacher.
+func (s *Service) validate(ctx context.Context, p auth.Principal, kind string, req *SaveRequest, current *Exercise) error {
 	h, ok := handlerFor(kind)
 	if !ok {
 		return apperr.Validation(map[string]string{"kind": "Этот тип упражнения пока недоступен"})
 	}
+	if kind != KindPDF {
+		req.FileID = nil // only a PDF block has a file
+	}
 	errs := h.Validate(*req)
 	v := apperr.V(errs)
+	if kind == KindPDF && req.FileID != nil {
+		ok, err := s.fileAllowed(ctx, p, *req.FileID, current)
+		if err != nil {
+			return err
+		}
+		v.Check(ok, "file_id", "Файл не найден, загрузите PDF ещё раз")
+	}
 	req.Title = strings.TrimSpace(req.Title)
 	v.Check(req.Title != "" && len([]rune(req.Title)) <= 200, "title", "Введите заголовок")
 	st := &req.Settings
@@ -140,14 +163,14 @@ func (s *Service) Create(ctx context.Context, p auth.Principal, lessonID uuid.UU
 		}
 	case ScopeHomework:
 		req.SectionID = nil
-		v.Check(req.Kind != KindText, "kind", "Текстовый блок добавляется в раздел урока, а не в домашнюю работу")
+		v.Check(!LessonOnly(req.Kind), "kind", "Этот блок добавляется в раздел урока, а не в домашнюю работу")
 	default:
 		v.Add("scope", "Укажите, куда добавить упражнение")
 	}
 	if err := v.Err(); err != nil {
 		return nil, err
 	}
-	if err := s.validate(ctx, p, req.Kind, &req.SaveRequest); err != nil {
+	if err := s.validate(ctx, p, req.Kind, &req.SaveRequest, nil); err != nil {
 		return nil, err
 	}
 	id, err := s.repo.Create(ctx, lessonID, req.Scope, req.SectionID, req.Kind, p.UserID, nil, req.SaveRequest)
@@ -176,7 +199,7 @@ func (s *Service) Update(ctx context.Context, p auth.Principal, id uuid.UUID, re
 	if err != nil {
 		return nil, err
 	}
-	if err := s.validate(ctx, p, e.Kind, &req); err != nil {
+	if err := s.validate(ctx, p, e.Kind, &req, e); err != nil {
 		return nil, err
 	}
 	if err := s.repo.SaveVersion(ctx, id, p.UserID, req); err != nil {
@@ -333,4 +356,72 @@ func (s *Service) CreateCategory(ctx context.Context, p auth.Principal, req Cate
 		return nil, apperr.Validation(map[string]string{"name": "Такая категория уже есть"})
 	}
 	return c, err
+}
+
+// ---------- «PDF-документ» files ----------
+
+// fileAllowed: the teacher uploaded the file, or it is the current file of the block being saved (a copied lesson
+// keeps the file of its source).
+func (s *Service) fileAllowed(ctx context.Context, p auth.Principal, fileID uuid.UUID, current *Exercise) (bool, error) {
+	f, err := s.repo.File(ctx, fileID)
+	if database.IsNoRows(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if f.OwnerID != nil && *f.OwnerID == p.UserID {
+		return true, nil
+	}
+	if current == nil {
+		return false, nil
+	}
+	cur, err := s.repo.VersionFile(ctx, current.VersionID)
+	if database.IsNoRows(err) {
+		return false, nil
+	}
+	return err == nil && cur.ID == fileID, err
+}
+
+// UploadFile stores a PDF for a block of the teacher's lesson. The block refers to it on save (file_id); until then
+// it is nobody's material and is served to no one.
+func (s *Service) UploadFile(ctx context.Context, p auth.Principal, lessonID uuid.UUID, original string, size int64, r io.Reader) (*File, error) {
+	if _, err := s.lessons.OwnedLesson(ctx, p, lessonID); err != nil {
+		return nil, err
+	}
+	st, err := s.files.StorePDF(size, r)
+	if err != nil {
+		return nil, err
+	}
+	f, err := s.repo.InsertFile(ctx, p.UserID, uploads.SanitizeName(original), st.StoredName, st.MimeType, st.SizeBytes)
+	if err != nil {
+		s.files.RemoveStored(st.StoredName)
+		return nil, err
+	}
+	return f, nil
+}
+
+// OpenFile serves the PDF of a block of the teacher's own lesson (the editor and the teacher preview).
+func (s *Service) OpenFile(ctx context.Context, p auth.Principal, id uuid.UUID) (*File, *os.File, error) {
+	e, err := s.owned(ctx, p, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s.OpenVersionFile(ctx, e.VersionID)
+}
+
+// OpenVersionFile opens the file of a version. Used by other modules after they have checked access.
+func (s *Service) OpenVersionFile(ctx context.Context, versionID uuid.UUID) (*File, *os.File, error) {
+	f, err := s.repo.VersionFile(ctx, versionID)
+	if err != nil {
+		if database.IsNoRows(err) {
+			return nil, nil, apperr.NotFound("Файл")
+		}
+		return nil, nil, err
+	}
+	fh, err := s.files.OpenStored(f.StoredName)
+	if err != nil {
+		return nil, nil, apperr.NotFound("Файл")
+	}
+	return f, fh, nil
 }

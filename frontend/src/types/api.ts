@@ -353,7 +353,14 @@ export interface Question {
 }
 
 /** Exercise kinds that work at this stage. */
-export type ExerciseKind = 'test' | 'gaps' | 'text';
+export type ExerciseKind = 'test' | 'gaps' | 'text' | 'pdf';
+
+/** The PDF of a «PDF-документ» block. It is opened only through its exercise (see exercisesApi.fileUrl / attemptsApi.fileUrl). */
+export interface LessonFile {
+  id: string;
+  name: string;
+  size_bytes: number;
+}
 
 export interface ExerciseVersion {
   id: string;
@@ -363,6 +370,8 @@ export interface ExerciseVersion {
   title: string;
   settings: ExerciseSettings;
   questions: Question[];
+  /** «PDF-документ» only. */
+  file: LessonFile | null;
   created_at: string;
 }
 
@@ -400,6 +409,8 @@ export interface SaveExerciseRequest {
   settings: ExerciseSettings;
   questions: { prompt: string; multiple: boolean; options: { label: string; is_correct: boolean }[] }[];
   hidden?: boolean;
+  /** «PDF-документ»: the uploaded file (POST /lessons/:id/files). */
+  file_id?: string | null;
 }
 
 export interface ExerciseStats {

@@ -252,7 +252,7 @@
   },
   "catalog": {
     "title": "Add exercise",
-    "hint": "At this stage «Test», «Words and gaps» (one gap per phrase) and «Text» — a block for reading and speaking practice with no answer and no grade — work. Other types are listed for completeness and are not available yet.",
+    "hint": "At this stage «Test», «Words and gaps» (one gap per phrase), «Text» — a block for reading and speaking practice — and «PDF document» — a PDF file to read right in the lesson — work. Text and PDF blocks have no answer and no grade. Other types are listed for completeness and are not available yet.",
     "unavailable": "Unavailable",
     "groups": {
       "media": "Media",
@@ -264,6 +264,7 @@
     "types": {
       "image": "Images",
       "audio_video": "Audio and video",
+      "pdf": "PDF document",
       "gaps": "Words and gaps",
       "test": "Test",
       "true_false": "True / false",
@@ -352,7 +353,10 @@
     "textBodyPlaceholder": "Aruzhan: Hello! I'm Aruzhan.\nBen: Hi, Aruzhan! My name is Ben.",
     "textTooLong": "At most {n} characters",
     "textHidden": "Teacher only",
-    "textHiddenHint": "The student does not receive this block: use it for notes and answer keys"
+    "textHiddenHint": "The student does not receive this block: use it for notes and answer keys",
+    "titleNewPdf": "New PDF document",
+    "titleEditPdf": "Edit PDF document",
+    "pdfTitlePlaceholder": "For example: Worksheet — Present Simple"
   },
   "test": {
     "startTitle": "Timed test",
@@ -553,7 +557,8 @@
     "image_type": "Upload a PNG, JPEG or WebP picture",
     "image_size": "The picture must be 16 to 6000 pixels on each side",
     "file_too_large": "The file is too large",
-    "invalid_credentials": "Wrong email or password."
+    "invalid_credentials": "Wrong email or password.",
+    "pdf_type": "Upload a PDF file"
   },
   "wip": {
     "badge": "In development",
@@ -1254,5 +1259,24 @@
     "copyForLesson": "Make a copy for the lesson",
     "copyForLessonHint": "A separate copy with every object and picture opens in the class: «Board title — Class name — Date». The lesson's strokes are saved in the copy, the original stays as it is.",
     "copyOpenedInClass": "The copy «{title}» is open in «{name}»"
+  },
+  "pdf": {
+    "file": "PDF file",
+    "choose": "Choose a PDF from your computer",
+    "replace": "Replace file",
+    "uploading": "Uploading «{name}»…",
+    "uploaded": "Uploaded",
+    "current": "Current file",
+    "hint": "PDF only, up to 20 MB. The student reads the document in the lesson: there is no answer field and no grade.",
+    "tooLarge": "«{name}» is larger than 20 MB. Choose a smaller PDF or compress it.",
+    "notPdf": "«{name}» is not a PDF. Choose a document in PDF format.",
+    "uploadFailed": "Could not upload «{name}»: {reason}",
+    "required": "Choose a PDF file",
+    "open": "Open PDF in a new tab",
+    "fallback": "If the document does not show, open it in a new tab.",
+    "frameTitle": "PDF document «{title}»",
+    "preview": "Preview",
+    "replaceNote": "Students will see the new file after you save.",
+    "deleteBlock": "Delete block"
   }
 }

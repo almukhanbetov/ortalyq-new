@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { AlignLeft, ArrowDownUp, CheckSquare, Image as ImageIcon, Layers, Link2, ListChecks, Minus, Plug, PencilLine, Shuffle, StickyNote, ToggleLeft, Lock } from 'lucide-react';
+import { AlignLeft, ArrowDownUp, CheckSquare, FileText, Image as ImageIcon, Layers, Link2, ListChecks, Minus, Plug, PencilLine, Shuffle, StickyNote, ToggleLeft, Lock } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Modal, QueryState, cn } from '@/components/ui';
 import { exercisesApi } from '@/lib/api/endpoints';
@@ -9,13 +9,13 @@ import { qk } from '@/lib/queryKeys';
 import { useT } from '@/lib/i18n';
 
 const icons: Record<string, ReactNode> = {
-  image: <ImageIcon size={22} />, audio_video: <Layers size={22} />, gaps: <PencilLine size={22} />, test: <ListChecks size={22} />,
+  image: <ImageIcon size={22} />, audio_video: <Layers size={22} />, pdf: <FileText size={22} />, gaps: <PencilLine size={22} />, test: <ListChecks size={22} />,
   true_false: <ToggleLeft size={22} />, ordering: <ArrowDownUp size={22} />, matching: <Shuffle size={22} />, text: <AlignLeft size={22} />,
   word_set: <CheckSquare size={22} />, note: <StickyNote size={22} />, link: <Link2 size={22} />, divider: <Minus size={22} />, integrations: <Plug size={22} />,
 };
 
 /** Kinds that cannot go to homework (read-only blocks have no answer to send). */
-const LESSON_ONLY = new Set(['text']);
+const LESSON_ONLY = new Set(['text', 'pdf']);
 
 export function CatalogModal({ open, onClose, onPick, homework }: { open: boolean; onClose: () => void; onPick: (kind: string) => void; homework?: boolean }) {
   const t = useT();
