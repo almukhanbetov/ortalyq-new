@@ -47,6 +47,7 @@
 ```bash
 docker compose up -d --build && docker compose exec api api seed   # весь стек
 ./scripts/reset-demo-db.sh                                         # чистая демо-БД (локально)
+cd backend && go run ./cmd/api seed-course [email]                 # авторские курсы internal/content (повторяемо)
 cd backend && go vet ./... && TEST_DATABASE_URL=...ortalyq_new_test go test ./...
 cd frontend && npm run typecheck && npm run lint && npm run build
 cd frontend && node scripts/e2e.mjs                                # браузерный сценарий + скриншоты

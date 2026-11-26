@@ -33,6 +33,23 @@ func NewService(repo *Repository, lessons Lessons, notify Notifier) *Service {
 
 func (s *Service) Catalog() []CatalogEntry { return Catalog }
 
+// CheckContent validates an exercise body (questions, options, title) without the database, with the same
+// rules as the editor. Settings that need the database (score categories) are not checked here.
+func CheckContent(kind string, req SaveRequest) map[string]string {
+	h, ok := handlerFor(kind)
+	if !ok {
+		return map[string]string{"kind": "Этот тип упражнения пока недоступен"}
+	}
+	errs := h.Validate(req)
+	if t := strings.TrimSpace(req.Title); t == "" || len([]rune(t)) > 200 {
+		errs["title"] = "Введите заголовок"
+	}
+	if m := req.Settings.CheckMode; m != CheckInstant && m != CheckAfter {
+		errs["settings.check_mode"] = "Неизвестный режим проверки"
+	}
+	return errs
+}
+
 func (s *Service) validate(ctx context.Context, p auth.Principal, kind string, req *SaveRequest) error {
 	h, ok := handlerFor(kind)
 	if !ok {

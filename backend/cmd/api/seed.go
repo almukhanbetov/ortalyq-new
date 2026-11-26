@@ -2,13 +2,16 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"ortalyq/backend/internal/config"
+	"ortalyq/backend/internal/content"
 	"ortalyq/backend/internal/database"
 	"ortalyq/backend/internal/modules/auth"
 )
@@ -45,7 +48,7 @@ func seed(cfg config.Config) error {
 		{"teacher2@ortalyq.local", "Олжас Ахметов", "teacher", "#F759AB"},
 	}
 	ids := map[string]uuid.UUID{}
-	return database.WithTx(ctx, pool, func(tx pgx.Tx) error {
+	err = database.WithTx(ctx, pool, func(tx pgx.Tx) error {
 		for _, a := range accounts {
 			p := pw[a.role]
 			hash, err := auth.HashPassword(p)
@@ -135,4 +138,63 @@ func seed(cfg config.Config) error {
 		fmt.Println("demo data created")
 		return err
 	})
+	if err != nil {
+		return err
+	}
+	// The author course is loaded on every seed: it adds only what this teacher has never received.
+	return loadCourse(ctx, pool, "teacher@ortalyq.local")
+}
+
+// seedCourse loads the author courses of internal/content into one teacher's «Материалы» without touching
+// accounts: `api seed-course [teacher-email]` (default teacher@ortalyq.local). Safe to repeat.
+func seedCourse(cfg config.Config, args []string) error {
+	if !cfg.IsLocal() {
+		return fmt.Errorf("seed-course is only allowed with APP_ENV=local")
+	}
+	email := "teacher@ortalyq.local"
+	if len(args) > 0 {
+		email = args[0]
+	}
+	ctx := context.Background()
+	pool, err := database.Connect(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	return loadCourse(ctx, pool, email)
+}
+
+func loadCourse(ctx context.Context, pool *pgxpool.Pool, email string) error {
+	var owner uuid.UUID
+	if err := pool.QueryRow(ctx, `SELECT id FROM users WHERE lower(email) = lower($1) AND role = 'teacher'`, email).Scan(&owner); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("teacher %s not found", email)
+		}
+		return err
+	}
+	for _, c := range []content.Course{content.EnglishA1} {
+		r, err := content.Load(ctx, pool, owner, c)
+		if err != nil {
+			return fmt.Errorf("%s: %w", c.Title, err)
+		}
+		switch {
+		case r.CourseDeleted:
+			fmt.Printf("«%s»: loaded before and deleted by %s — not restored\n", c.Title, email)
+			continue
+		case r.CourseCreated:
+			fmt.Printf("«%s»: created for %s (course %s)\n", c.Title, email, r.CourseID)
+		default:
+			fmt.Printf("«%s»: already in %s's materials (course %s)\n", c.Title, email, r.CourseID)
+		}
+		for _, t := range r.Created {
+			fmt.Printf("  + %s\n", t)
+		}
+		for _, t := range r.Kept {
+			fmt.Printf("  = %s (kept as is)\n", t)
+		}
+		for _, t := range r.Deleted {
+			fmt.Printf("  - %s (deleted by the teacher, not restored)\n", t)
+		}
+	}
+	return nil
 }

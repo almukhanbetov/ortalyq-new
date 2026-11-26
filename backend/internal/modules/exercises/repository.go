@@ -48,17 +48,25 @@ func insertVersion(ctx context.Context, tx pgx.Tx, exerciseID uuid.UUID, by uuid
 
 func (r *Repository) Create(ctx context.Context, lessonID uuid.UUID, scope string, sectionID *uuid.UUID, kind string, by uuid.UUID, copiedFrom *uuid.UUID, req SaveRequest) (uuid.UUID, error) {
 	var id uuid.UUID
-	hidden := req.Hidden != nil && *req.Hidden
-	err := database.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
-		if err := tx.QueryRow(ctx, `INSERT INTO exercises (lesson_id, scope, section_id, kind, hidden, created_by, copied_from_id, position)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT COALESCE(max(position), -1) + 1 FROM exercises
-			  WHERE lesson_id = $1 AND scope = $2 AND section_id IS NOT DISTINCT FROM $3 AND deleted_at IS NULL)) RETURNING id`,
-			lessonID, scope, sectionID, kind, hidden, by, copiedFrom).Scan(&id); err != nil {
-			return err
-		}
-		_, err := insertVersion(ctx, tx, id, by, req)
+	err := database.WithTx(ctx, r.pool, func(tx pgx.Tx) (err error) {
+		id, err = CreateTx(ctx, tx, lessonID, scope, sectionID, kind, by, copiedFrom, req)
 		return err
 	})
+	return id, err
+}
+
+// CreateTx inserts an exercise with its first version inside the caller's transaction
+// (the editor via Create, the course loader in internal/content). The request must be validated already.
+func CreateTx(ctx context.Context, tx pgx.Tx, lessonID uuid.UUID, scope string, sectionID *uuid.UUID, kind string, by uuid.UUID, copiedFrom *uuid.UUID, req SaveRequest) (uuid.UUID, error) {
+	var id uuid.UUID
+	hidden := req.Hidden != nil && *req.Hidden
+	if err := tx.QueryRow(ctx, `INSERT INTO exercises (lesson_id, scope, section_id, kind, hidden, created_by, copied_from_id, position)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, (SELECT COALESCE(max(position), -1) + 1 FROM exercises
+		  WHERE lesson_id = $1 AND scope = $2 AND section_id IS NOT DISTINCT FROM $3 AND deleted_at IS NULL)) RETURNING id`,
+		lessonID, scope, sectionID, kind, hidden, by, copiedFrom).Scan(&id); err != nil {
+		return uuid.Nil, err
+	}
+	_, err := insertVersion(ctx, tx, id, by, req)
 	return id, err
 }
 
