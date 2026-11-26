@@ -19,6 +19,7 @@ import (
 	"ortalyq/backend/internal/modules/exercises"
 	"ortalyq/backend/internal/modules/grading"
 	"ortalyq/backend/internal/modules/homework"
+	"ortalyq/backend/internal/modules/library"
 	"ortalyq/backend/internal/modules/marathons"
 	"ortalyq/backend/internal/modules/materials"
 	"ortalyq/backend/internal/modules/passwordreset"
@@ -99,6 +100,7 @@ func New(cfg config.Config, pool *pgxpool.Pool) (*App, error) {
 	users.NewHandler(usersSvc).Register(authed)
 	classrooms.NewHandler(classSvc, hub).Register(authed)
 	materials.NewHandler(matSvc).Register(authed)
+	library.NewHandler(library.NewService(library.NewRepository(pool))).Register(authed)
 	boards.NewHandler(boards.NewService(boards.NewRepository(pool), upSvc, classSvc, hub)).Register(authed)
 	exercises.NewHandler(exSvc).Register(authed)
 	attempts.NewHandler(attSvc).Register(authed)

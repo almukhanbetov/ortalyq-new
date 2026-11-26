@@ -6,6 +6,7 @@ import type {
   BoardImage,
   BoardItem,
   BoardSummary,
+  CatalogCourse,
   StudentInviteAccepted, StudentInviteLink, StudentInviteSent,
   Appearance, AppearanceRequest, EffectiveAppearance, ImageSlot, MarathonAppearance,
   Assignment, Attachment, CatalogEntry, Category, ChatMessage, Classroom, Course, Exercise, ExerciseStats, ExerciseView,
@@ -145,6 +146,13 @@ export const classBoardApi = {
     api.post<{ item_id: string; version: number; duplicate: boolean }>(`/classrooms/${cid}/board/strokes`, body),
   /** A picture of the open board, served to members of the class only. */
   imageUrl: (cid: string, imageId: string) => `${API_URL}/api/classrooms/${cid}/board/images/${imageId}`,
+};
+
+/** «Материалы» → «Каталог». */
+export const libraryApi = {
+  list: (q: string) => api.get<{ items: CatalogCourse[]; total: number }>('/material-catalog', { q }),
+  get: (key: string) => api.get<CatalogCourse>(`/material-catalog/${encodeURIComponent(key)}`),
+  add: (key: string) => api.post<{ course_id: string; created: boolean }>(`/material-catalog/${encodeURIComponent(key)}/add`),
 };
 
 export const materialsApi = {

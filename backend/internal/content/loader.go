@@ -98,6 +98,17 @@ func Validate(c Course) error {
 // overwrites a lesson the teacher has changed and does not bring back what the teacher deleted.
 // Everything happens in one transaction under an advisory lock, so parallel loads cannot both create.
 func Load(ctx context.Context, pool *pgxpool.Pool, ownerID uuid.UUID, c Course) (*Result, error) {
+	return load(ctx, pool, ownerID, c, false)
+}
+
+// AddFromCatalog is «Добавить в мои материалы»: the same load, except that a course the teacher once received and
+// later deleted is given again as a fresh copy (the teacher asks for it explicitly). While the copy exists, adding
+// again creates nothing.
+func AddFromCatalog(ctx context.Context, pool *pgxpool.Pool, ownerID uuid.UUID, c Course) (*Result, error) {
+	return load(ctx, pool, ownerID, c, true)
+}
+
+func load(ctx context.Context, pool *pgxpool.Pool, ownerID uuid.UUID, c Course, restore bool) (*Result, error) {
 	if err := Validate(c); err != nil {
 		return nil, err
 	}
@@ -115,11 +126,19 @@ func Load(ctx context.Context, pool *pgxpool.Pool, ownerID uuid.UUID, c Course) 
 			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM courses WHERE id = $1 AND owner_id = $2)`, courseID, ownerID).Scan(&exists); err != nil {
 				return err
 			}
-			if !exists {
+			if !exists && !restore {
 				res.CourseDeleted = true
 				return nil
 			}
-		} else {
+			if !exists {
+				// Forget the deleted copy (the course and its lessons/blocks) and load a new one.
+				if _, err := tx.Exec(ctx, `DELETE FROM content_imports WHERE owner_id = $1 AND (key = $2 OR left(key, length($2) + 1) = $2 || '/')`, ownerID, c.Key); err != nil {
+					return err
+				}
+				seen = false
+			}
+		}
+		if !seen {
 			if err := tx.QueryRow(ctx, `INSERT INTO courses (owner_id, title, description, cover_color, position)
 				VALUES ($1, $2, $3, $4, (SELECT COALESCE(max(position), -1) + 1 FROM courses WHERE owner_id = $1)) RETURNING id`,
 				ownerID, c.Title, c.Description, c.CoverColor).Scan(&courseID); err != nil {

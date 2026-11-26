@@ -236,7 +236,19 @@
     "notFound": "Material not found",
     "notFoundHint": "The link may be wrong, or the material belongs to another teacher.",
     "moveEarlier": "Move earlier",
-    "moveLater": "Move later"
+    "moveLater": "Move later",
+    "catalog": "Catalog",
+    "catalogSearch": "Search the catalog",
+    "catalogCount": "Courses in the catalog {n}",
+    "level": "Level {level}",
+    "inMyMaterials": "In my materials",
+    "addToMine": "Add to my materials",
+    "openInMine": "Open in my materials",
+    "catalogAdded": "The course is added to «Personal materials»",
+    "catalogAlready": "The course is already in «Personal materials»",
+    "catalogAddHint": "You get your own copy: you can change it, the catalog original stays as is. Teacher notes and keys stay hidden from students.",
+    "catalogOwnedHint": "The course is already in «Personal materials». Adding it again does not create a second copy.",
+    "catalogLessonMeta": "{level} · {min} min · texts: {texts} · exercises: {ex} · homework: {hw}"
   },
   "catalog": {
     "title": "Add exercise",

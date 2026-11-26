@@ -1,8 +1,8 @@
-// «Материалы» → «Интерактивные доски» in the browser. Teacher A: the tab next to «Личные материалы» → the
+// «Материалы» → «Интерактивные доски» in the browser. Teacher A: the tab next to «Личные материалы» and «Каталог» → the
 // empty list with «Создать доску» → the board «English A1 — Hello!» → text «Hello! My name is …» and a drawing → undo →
 // save → a failed save keeps the changes and «Повторить сохранение» saves them → reload restores the drawing and the text → the
 // list shows the board with its change date and finds it by title. Teacher B: the board is not in the list and its
-// direct link shows «Доска не найдена» (the API answers 404); «Личные материалы» opens from the tabs.
+// direct link shows «Доска не найдена» (the API answers 404); «Личные материалы» and «Каталог» open.
 // It creates its own users and data, so it runs only against an isolated stack:
 //   WEB_URL=http://localhost:3449 API_URL=http://localhost:8449 SHOTS_DIR=… node scripts/boards-check.mjs
 import { chromium } from 'playwright-core';
@@ -62,12 +62,12 @@ try {
   const p = await login(A.email, A.password);
   await p.goto(`${WEB}/materials`);
   const tabs = p.getByRole('navigation', { name: 'Разделы материалов' });
-  await tabs.getByRole('link', { name: 'Личные материалы' }).waitFor();
+  for (const name of ['Личные материалы', 'Каталог']) await tabs.getByRole('link', { name }).waitFor();
   await tabs.getByRole('link', { name: 'Интерактивные доски' }).click();
   await p.waitForURL((u) => u.pathname === '/materials/boards');
   await p.getByText('У вас пока нет интерактивных досок').waitFor();
   await p.screenshot({ path: `${OUT}/01-boards-empty.png` });
-  ok('«Интерактивные доски» next to «Личные материалы»; the empty list offers «Создать доску»');
+  ok('«Интерактивные доски» next to «Личные материалы» and «Каталог»; the empty list offers «Создать доску»');
 
   // ---- 2. Create and draw ----
   await p.getByRole('button', { name: 'Создать доску' }).click();
@@ -164,12 +164,15 @@ try {
   assert(r.status === 404 && w.status === 404, `B by API: GET ${r.status}, PUT ${w.status}`);
   ok('another teacher: the board is not in the list, the direct link shows «Доска не найдена», the API answers 404 to read and save');
 
-  // ---- 7. «Личные материалы» still opens from the tabs ----
-  await q.goto(`${WEB}/materials/boards`);
+  // ---- 7. «Личные материалы» and «Каталог» still open ----
+  await q.goto(`${WEB}/materials`);
+  await q.getByRole('heading', { name: 'Материалы' }).waitFor();
+  await q.getByRole('navigation', { name: 'Разделы материалов' }).getByRole('link', { name: 'Каталог' }).click();
+  await q.getByRole('listitem').filter({ hasText: 'English A1 — Первые разговоры' }).waitFor();
   await q.getByRole('navigation', { name: 'Разделы материалов' }).getByRole('link', { name: 'Личные материалы' }).click();
   await q.waitForURL((u) => u.pathname === '/materials');
-  await q.getByRole('heading', { level: 1 }).waitFor();
-  ok('«Личные материалы» opens from the boards tabs');
+  await q.getByRole('searchbox', { name: 'Поиск по названию' }).waitFor();
+  ok('«Личные материалы» and «Каталог» open');
 
   assert(errors.length === 0, `console errors: ${errors.join(' | ')}`);
   assert(external.size === 0, `external requests: ${[...external].join(' ')}`);

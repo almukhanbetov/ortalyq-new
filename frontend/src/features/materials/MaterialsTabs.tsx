@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { useT } from '@/lib/i18n';
 import { cn } from '@/components/ui';
-import { boardsUrl, materialsUrl } from '@/lib/routes';
+import { boardsUrl, materialsCatalogUrl, materialsUrl } from '@/lib/routes';
 
-/** «Личные материалы» | «Интерактивные доски» under the «Материалы» heading. */
-export function MaterialsTabs({ current }: { current: 'personal' | 'boards' }) {
+/** «Личные материалы» | «Каталог» | «Интерактивные доски» under the «Материалы» heading. */
+export function MaterialsTabs({ current }: { current: 'personal' | 'catalog' | 'boards' }) {
   const t = useT();
   const tabs = [
     { key: 'personal', href: materialsUrl(), label: t('materials.personal') },
+    { key: 'catalog', href: materialsCatalogUrl(), label: t('materials.catalog') },
     { key: 'boards', href: boardsUrl(), label: t('boards.tab') },
   ] as const;
   return (

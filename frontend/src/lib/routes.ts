@@ -96,6 +96,13 @@ export function classUrl(c: { id: string; lesson_type: string }) {
   return c.lesson_type === 'marathon' ? marathonUrl(c.id) : `/classes/${c.id}`;
 }
 
+/** «Материалы» → «Каталог»: ready-made author courses to add to «Личные материалы». The search is kept in the address. */
+export const MATERIALS_CATALOG_ROUTE = '/materials/catalog';
+
+export function materialsCatalogUrl(params: { q?: string } = {}) {
+  return params.q ? `${MATERIALS_CATALOG_ROUTE}?q=${encodeURIComponent(params.q)}` : MATERIALS_CATALOG_ROUTE;
+}
+
 /** «Материалы» → «Интерактивные доски»: the teacher's personal boards. The search is kept in the address. */
 export const MATERIALS_BOARDS_ROUTE = '/materials/boards';
 

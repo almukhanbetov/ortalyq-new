@@ -683,6 +683,30 @@ export interface StudentInviteSent { email: string; expires_at: string; resend_a
 export interface StudentInviteLink { teacher_name: string; email: string; expires_at: string; has_account: boolean }
 export interface StudentInviteAccepted { teacher_name: string }
 
+/** «Материалы» → «Каталог». */
+export interface CatalogLesson {
+  title: string;
+  level: string;
+  duration_min: number;
+  sections: string[];
+  exercises: number;
+  text_blocks: number;
+  homework: number;
+}
+
+export interface CatalogCourse {
+  key: string;
+  title: string;
+  description: string;
+  cover_color: string;
+  level: string;
+  language: string;
+  lesson_count: number;
+  lessons: CatalogLesson[];
+  /** The teacher's own copy in «Личные материалы»; null until added. */
+  owned_course_id: string | null;
+}
+
 /**
  * «Интерактивные доски»: an element of the drawing (board coordinates; the initial view is 1600 × 1000 at 100%).
  * `id` is the editor's stable id; boards saved before ids existed get them on load.
