@@ -9,7 +9,7 @@ import type {
   CatalogCourse,
   StudentInviteAccepted, StudentInviteLink, StudentInviteSent,
   Appearance, AppearanceRequest, EffectiveAppearance, ImageSlot, MarathonAppearance,
-  Assignment, Attachment, CatalogEntry, Category, ChatMessage, Classroom, Course, Exercise, ExerciseStats, ExerciseView,
+  Assignment, Attachment, CatalogEntry, Category, ChatMessage, Classroom, Course, Exercise, ExerciseStats, ExerciseView, LessonFile, MaterialDocument, CourseCover,
   FilterOptions, Gif, Grade, InvitationInfo, InviteResult, MarathonInvitation, HomeworkStatus, HomeworkView, Lesson, LessonAttrs, LessonFilter, ListResponse, MarathonLessonCopied, MarathonLessonFields, MarathonLessonReview, MarathonLessons, MarathonMe, MarathonMode, MarathonPassage, MarathonLessonComment, MarathonLessonResults, MarathonMyResults, MarathonReviewRequest, MarathonStudentsRating, MarathonSaveRequest, MarathonStats, MarathonStatsSettings, MarathonUnlockAfter, MarathonStudent, MarathonStudentProgress, Me, Progress,
   SaveExerciseRequest, Scope, Section, SignupLink, SignupRequested, User,
 } from '@/types/api';
@@ -155,11 +155,38 @@ export const libraryApi = {
   add: (key: string) => api.post<{ course_id: string; created: boolean }>(`/material-catalog/${encodeURIComponent(key)}/add`),
 };
 
+/** «Личные материалы» → PDF documents of the teacher (only the owner lists and opens them). */
+export const documentsApi = {
+  list: (q: string) => api.get<ListResponse<MaterialDocument>>('/documents', { q, limit: 100 }),
+  get: (id: string) => api.get<MaterialDocument>(`/documents/${id}`),
+  /** The PDF for the browser's viewer; the API checks the owner on every request (also for a link opened directly). */
+  fileUrl: (id: string) => `${API_URL}/api/documents/${id}/file`,
+};
+
+/** Fields of «Создать материал» / editing a material. cover_image_id '' removes the picture. */
+export interface CourseFields {
+  title?: string;
+  description?: string;
+  cover_color?: string;
+  cover_image_id?: string;
+  language?: string;
+  sections_enabled?: boolean;
+  tags?: string[];
+}
+
 export const materialsApi = {
   courses: (f: LessonFilter & { limit?: number; offset?: number }) => api.get<ListResponse<Course>>('/courses', { ...f }),
   course: (id: string, f: LessonFilter = {}) => api.get<Course>(`/courses/${id}`, { ...f }),
-  createCourse: (body: { title: string; description?: string; cover_color?: string }) => api.post<Course>('/courses', body),
-  updateCourse: (id: string, body: { title?: string; description?: string; cover_color?: string }) => api.patch<Course>(`/courses/${id}`, body),
+  createCourse: (body: CourseFields & { title: string }) => api.post<Course>('/courses', body),
+  updateCourse: (id: string, body: CourseFields) => api.patch<Course>(`/courses/${id}`, body),
+  /** Uploads a cover picture for the material form; the material refers to it by cover_image_id when saved. */
+  uploadCover: (file: File) => {
+    const f = new FormData();
+    f.append('file', file);
+    return api.upload<CourseCover>('/course-covers', f);
+  },
+  /** The cover picture, for its owner (the browser sends the session cookie). */
+  coverUrl: (id: string) => `${API_URL}/api/course-covers/${id}`,
   reorderCourses: (ids: string[]) => api.put<void>('/courses/order', { ids }),
   createLesson: (courseId: string, title: string) => api.post<Lesson>(`/courses/${courseId}/lessons`, { title }),
   reorderLessons: (courseId: string, ids: string[]) => api.put<void>(`/courses/${courseId}/lessons/order`, { ids }),
@@ -183,6 +210,14 @@ export const exercisesApi = {
   reorder: (lessonId: string, scope: Scope, section_id: string | null, ids: string[]) => api.put<void>(`/lessons/${lessonId}/exercises/order`, { scope, section_id, ids }),
   copyToHomework: (id: string) => api.post<Exercise>(`/exercises/${id}/copy-to-homework`),
   stats: (id: string) => api.get<ExerciseStats>(`/exercises/${id}/stats`),
+  /** Uploads the PDF of a «PDF-документ» block of the teacher's lesson; the block refers to it by file_id on save. */
+  uploadFile: (lessonId: string, file: File) => {
+    const f = new FormData();
+    f.append('file', file);
+    return api.upload<LessonFile>(`/lessons/${lessonId}/files`, f);
+  },
+  /** The PDF of a block, for the owner of the lesson (editor, preview). The browser sends the session cookie. */
+  fileUrl: (id: string) => `${API_URL}/api/exercises/${id}/file`,
   categories: () => api.get<{ items: Category[] }>('/score-categories'),
   createCategory: (name: string) => api.post<Category>('/score-categories', { name }),
 };
@@ -197,6 +232,8 @@ export const attemptsApi = {
   answer: (attemptId: string, questionId: string, optionIds: string[], check: boolean, text = '') =>
     api.put<ExerciseView>(`/attempts/${attemptId}/answers/${questionId}`, { option_ids: optionIds, text, check }),
   finish: (attemptId: string) => api.post<ExerciseView>(`/attempts/${attemptId}/finish`),
+  /** The PDF of a «PDF-документ» block, for a member of the class who may see the block. */
+  fileUrl: (cid: string, eid: string) => `${API_URL}/api/classrooms/${cid}/exercises/${eid}/file`,
 };
 
 /** Teacher preview (stage 8): the lesson owner takes the lesson with separate preview attempts. */

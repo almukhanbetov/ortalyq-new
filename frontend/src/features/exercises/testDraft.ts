@@ -1,11 +1,15 @@
 // Editor draft model for the "test" exercise and its client-side validation
 // (mirrors the server rules; the server remains authoritative).
-import type { Exercise, ExerciseSettings, SaveExerciseRequest } from '@/types/api';
+import type { Exercise, ExerciseSettings, LessonFile, SaveExerciseRequest } from '@/types/api';
 import type { TFunction } from '@/lib/i18n';
 
 export interface DraftOption { key: string; label: string; correct: boolean }
 export interface DraftQuestion { key: string; prompt: string; multiple: boolean; options: DraftOption[] }
-export interface TestDraft { title: string; hidden: boolean; settings: ExerciseSettings; questions: DraftQuestion[] }
+export interface TestDraft {
+  title: string; hidden: boolean; settings: ExerciseSettings; questions: DraftQuestion[];
+  /** «PDF-документ» only: the uploaded file. */
+  file?: LessonFile | null;
+}
 
 const key = () => Math.random().toString(36).slice(2, 10);
 
@@ -30,6 +34,7 @@ export function draftFromExercise(e: Exercise): TestDraft {
     title: e.version.title,
     hidden: e.hidden,
     settings: { ...e.version.settings },
+    file: e.version.file ?? null,
     questions: e.version.questions.map((q) => ({
       key: key(), prompt: q.prompt, multiple: q.multiple,
       options: q.options.map((o) => ({ key: key(), label: o.label, correct: !!o.is_correct })),
@@ -42,6 +47,7 @@ export function toRequest(d: TestDraft): SaveExerciseRequest {
     title: d.title.trim(),
     hidden: d.hidden,
     settings: { ...d.settings, timer_seconds: d.settings.timer_enabled ? d.settings.timer_seconds : null },
+    file_id: d.file?.id ?? null,
     questions: d.questions.map((q) => ({
       prompt: q.prompt.trim(), multiple: q.multiple,
       options: q.options.map((o) => ({ label: o.label.trim(), is_correct: o.correct })),

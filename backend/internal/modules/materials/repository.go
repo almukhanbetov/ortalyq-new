@@ -42,8 +42,7 @@ func (r *Repository) ListCourses(ctx context.Context, owner uuid.UUID, f LessonF
 		return nil, 0, err
 	}
 	args = append(args, limit, offset)
-	rows, err := r.db.Query(ctx, `SELECT c.id, c.owner_id, c.title, c.description, c.cover_color, c.position,
-		(SELECT count(*) FROM lessons l WHERE l.course_id = c.id), c.created_at, c.updated_at
+	rows, err := r.db.Query(ctx, `SELECT `+courseCols+`
 		FROM courses c WHERE `+where+` ORDER BY c.position, c.created_at LIMIT $14 OFFSET $15`, args...)
 	if err != nil {
 		return nil, 0, err
@@ -52,7 +51,7 @@ func (r *Repository) ListCourses(ctx context.Context, owner uuid.UUID, f LessonF
 	out := []Course{}
 	for rows.Next() {
 		var c Course
-		if err := rows.Scan(&c.ID, &c.OwnerID, &c.Title, &c.Description, &c.CoverColor, &c.Position, &c.LessonCount, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := scanCourse(rows, &c); err != nil {
 			return nil, 0, err
 		}
 		out = append(out, c)
@@ -60,12 +59,17 @@ func (r *Repository) ListCourses(ctx context.Context, owner uuid.UUID, f LessonF
 	return out, total, rows.Err()
 }
 
+const courseCols = `c.id, c.owner_id, c.title, c.description, c.cover_color, c.cover_image_id, c.language, c.sections_enabled,
+	c.tags, c.position, (SELECT count(*) FROM lessons l WHERE l.course_id = c.id), c.created_at, c.updated_at`
+
+func scanCourse(row pgx.Row, c *Course) error {
+	return row.Scan(&c.ID, &c.OwnerID, &c.Title, &c.Description, &c.CoverColor, &c.CoverImageID, &c.Language, &c.SectionsEnabled,
+		&c.Tags, &c.Position, &c.LessonCount, &c.CreatedAt, &c.UpdatedAt)
+}
+
 func (r *Repository) GetCourse(ctx context.Context, id uuid.UUID) (*Course, error) {
 	var c Course
-	err := r.db.QueryRow(ctx, `SELECT c.id, c.owner_id, c.title, c.description, c.cover_color, c.position,
-		(SELECT count(*) FROM lessons l WHERE l.course_id = c.id), c.created_at, c.updated_at FROM courses c WHERE c.id = $1`, id).
-		Scan(&c.ID, &c.OwnerID, &c.Title, &c.Description, &c.CoverColor, &c.Position, &c.LessonCount, &c.CreatedAt, &c.UpdatedAt)
-	if err != nil {
+	if err := scanCourse(r.db.QueryRow(ctx, `SELECT `+courseCols+` FROM courses c WHERE c.id = $1`, id), &c); err != nil {
 		return nil, err
 	}
 	return &c, nil
@@ -73,10 +77,11 @@ func (r *Repository) GetCourse(ctx context.Context, id uuid.UUID) (*Course, erro
 
 const lessonCols = `l.id, l.course_id, l.title, l.description, l.position,
 	(SELECT count(*) FROM sections s WHERE s.lesson_id = l.id),
+	(SELECT c2.sections_enabled FROM courses c2 WHERE c2.id = l.course_id),
 	l.language, l.age, l.level, l.lesson_type, l.duration_min, l.skills, l.grammar, l.vocabulary, l.functions, l.tags, l.updated_at`
 
 func scanLesson(row pgx.Row, l *Lesson) error {
-	return row.Scan(&l.ID, &l.CourseID, &l.Title, &l.Description, &l.Position, &l.SectionCount,
+	return row.Scan(&l.ID, &l.CourseID, &l.Title, &l.Description, &l.Position, &l.SectionCount, &l.SectionsEnabled,
 		&l.Language, &l.Age, &l.Level, &l.LessonType, &l.DurationMin, &l.Skills, &l.Grammar, &l.Vocabulary, &l.Functions, &l.Tags, &l.UpdatedAt)
 }
 
@@ -141,27 +146,72 @@ func (r *Repository) SectionLesson(ctx context.Context, sectionID uuid.UUID) (uu
 	return id, err
 }
 
-func (r *Repository) CreateCourse(ctx context.Context, owner uuid.UUID, title, desc, color string) (*Course, error) {
+// NewCourse holds the checked fields of a new course.
+type NewCourse struct {
+	Title, Description, Color, Language string
+	CoverImageID                        *uuid.UUID
+	SectionsEnabled                     bool
+	Tags                                []string
+}
+
+func (r *Repository) CreateCourse(ctx context.Context, owner uuid.UUID, n NewCourse) (*Course, error) {
 	var id uuid.UUID
-	err := r.db.QueryRow(ctx, `INSERT INTO courses (owner_id, title, description, cover_color, position)
-		VALUES ($1, $2, $3, $4, (SELECT COALESCE(max(position), -1) + 1 FROM courses WHERE owner_id = $1)) RETURNING id`,
-		owner, title, desc, color).Scan(&id)
+	err := r.db.QueryRow(ctx, `INSERT INTO courses (owner_id, title, description, cover_color, cover_image_id, language, sections_enabled, tags, position)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, (SELECT COALESCE(max(position), -1) + 1 FROM courses WHERE owner_id = $1)) RETURNING id`,
+		owner, n.Title, n.Description, n.Color, n.CoverImageID, n.Language, n.SectionsEnabled, n.Tags).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
 	return r.GetCourse(ctx, id)
 }
 
-func (r *Repository) UpdateCourse(ctx context.Context, id uuid.UUID, title, desc, color *string) error {
+// CourseChanges are the checked fields of an update; nil leaves a field as it is. ClearCover removes the picture.
+type CourseChanges struct {
+	Title, Description, Color, Language *string
+	CoverImageID                        *uuid.UUID
+	ClearCover                          bool
+	SectionsEnabled                     *bool
+	Tags                                []string // nil: unchanged
+}
+
+func (r *Repository) UpdateCourse(ctx context.Context, id uuid.UUID, ch CourseChanges) error {
 	_, err := r.db.Exec(ctx, `UPDATE courses SET title = COALESCE($2, title), description = COALESCE($3, description),
-		cover_color = COALESCE($4, cover_color), updated_at = now() WHERE id = $1`, id, title, desc, color)
+		cover_color = COALESCE($4, cover_color), language = COALESCE($5, language),
+		cover_image_id = CASE WHEN $7 THEN NULL ELSE COALESCE($6, cover_image_id) END,
+		sections_enabled = COALESCE($8, sections_enabled), tags = COALESCE($9, tags), updated_at = now() WHERE id = $1`,
+		id, ch.Title, ch.Description, ch.Color, ch.Language, ch.CoverImageID, ch.ClearCover, ch.SectionsEnabled, ch.Tags)
 	return err
 }
 
+func (r *Repository) CreateCover(ctx context.Context, c *Cover) (*Cover, error) {
+	err := r.db.QueryRow(ctx, `INSERT INTO course_covers (owner_id, stored_name, mime_type, size_bytes, width, height)
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`, c.OwnerID, c.StoredName, c.MimeType, c.SizeBytes, c.Width, c.Height).
+		Scan(&c.ID, &c.CreatedAt)
+	return c, err
+}
+
+// Cover returns a cover picture or a no-rows error.
+func (r *Repository) Cover(ctx context.Context, id uuid.UUID) (*Cover, error) {
+	var c Cover
+	err := r.db.QueryRow(ctx, `SELECT id, owner_id, stored_name, mime_type, size_bytes, width, height, created_at FROM course_covers WHERE id = $1`, id).
+		Scan(&c.ID, &c.OwnerID, &c.StoredName, &c.MimeType, &c.SizeBytes, &c.Width, &c.Height, &c.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+// CreateLesson adds a lesson; in a course with «Разделы» off it gets one section in the same statement.
 func (r *Repository) CreateLesson(ctx context.Context, courseID uuid.UUID, title string) (*Lesson, error) {
 	var id uuid.UUID
-	err := r.db.QueryRow(ctx, `INSERT INTO lessons (course_id, title, position)
-		VALUES ($1, $2, (SELECT COALESCE(max(position), -1) + 1 FROM lessons WHERE course_id = $1)) RETURNING id`, courseID, title).Scan(&id)
+	err := r.db.QueryRow(ctx, `WITH l AS (
+			INSERT INTO lessons (course_id, title, position)
+			VALUES ($1, $2, (SELECT COALESCE(max(position), -1) + 1 FROM lessons WHERE course_id = $1)) RETURNING id
+		), s AS (
+			INSERT INTO sections (lesson_id, title, position)
+			SELECT l.id, $3, 0 FROM l WHERE NOT (SELECT sections_enabled FROM courses WHERE id = $1)
+		)
+		SELECT id FROM l`, courseID, title, DefaultSectionTitle).Scan(&id)
 	if err != nil {
 		return nil, err
 	}

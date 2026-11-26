@@ -16,6 +16,7 @@ import (
 	"ortalyq/backend/internal/modules/boards"
 	"ortalyq/backend/internal/modules/chat"
 	"ortalyq/backend/internal/modules/classrooms"
+	"ortalyq/backend/internal/modules/documents"
 	"ortalyq/backend/internal/modules/exercises"
 	"ortalyq/backend/internal/modules/grading"
 	"ortalyq/backend/internal/modules/homework"
@@ -61,7 +62,12 @@ func New(cfg config.Config, pool *pgxpool.Pool) (*App, error) {
 	matSvc := materials.NewService(materials.NewRepository(pool), classSvc)
 	classSvc.SetLessonOwnership(matSvc)
 
-	exSvc := exercises.NewService(exercises.NewRepository(pool), matSvc, classSvc)
+	upSvc, err := uploads.NewService(uploads.NewRepository(pool), classSvc, cfg.UploadDir, cfg.UploadMaxBytes)
+	if err != nil {
+		return nil, err
+	}
+	matSvc.SetFiles(upSvc)
+	exSvc := exercises.NewService(exercises.NewRepository(pool), matSvc, classSvc, upSvc)
 	hwRepo := homework.NewRepository(pool)
 	marRepo := marathons.NewRepository(pool)
 	// marRepo implements attempts.LessonReviewState: answers of a marathon lesson on the teacher's review are locked.
@@ -69,10 +75,6 @@ func New(cfg config.Config, pool *pgxpool.Pool) (*App, error) {
 	hwSvc := homework.NewService(hwRepo, classSvc, attSvc, hub)
 	gradeSvc := grading.NewService(grading.NewRepository(pool), classSvc, matSvc, attSvc, hub)
 
-	upSvc, err := uploads.NewService(uploads.NewRepository(pool), classSvc, cfg.UploadDir, cfg.UploadMaxBytes)
-	if err != nil {
-		return nil, err
-	}
 	chatSvc := chat.NewService(chat.NewRepository(pool), classSvc, upSvc, chat.NewGiphy(cfg.GiphyAPIKey, cfg.GiphyAPIBase), hub)
 
 	r := gin.New()
@@ -102,11 +104,12 @@ func New(cfg config.Config, pool *pgxpool.Pool) (*App, error) {
 	materials.NewHandler(matSvc).Register(authed)
 	library.NewHandler(library.NewService(library.NewRepository(pool))).Register(authed)
 	boards.NewHandler(boards.NewService(boards.NewRepository(pool), upSvc, classSvc, hub)).Register(authed)
-	exercises.NewHandler(exSvc).Register(authed)
-	attempts.NewHandler(attSvc).Register(authed)
+	exercises.NewHandler(exSvc, cfg.AllowedOrigins).Register(authed)
+	attempts.NewHandler(attSvc, cfg.AllowedOrigins).Register(authed)
 	homework.NewHandler(hwSvc).Register(authed)
 	grading.NewHandler(gradeSvc).Register(authed)
 	uploads.NewHandler(upSvc).Register(authed)
+	documents.NewHandler(documents.NewService(documents.NewRepository(pool), upSvc), cfg.AllowedOrigins).Register(authed)
 	chat.NewHandler(chatSvc).Register(authed)
 	marSvc := marathons.NewService(marRepo, classSvc, matSvc, matSvc, attSvc, usersSvc, hub)
 	classSvc.SetMarathonGate(marSvc)

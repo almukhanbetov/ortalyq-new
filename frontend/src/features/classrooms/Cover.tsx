@@ -12,15 +12,16 @@ export const COVER_COLORS = ['#1AC6FF', '#FF7A45', '#9254DE', '#16C784', '#F759A
  * - `banner` (default): gradient with initials in the corner — material lists and pickers;
  * - `tile`: soft tint of the class colour with large centred initials — the classes page.
  * With `imageId` (a marathon or lesson cover picture, stage 10) the picture is shown; if it cannot be loaded
- * (deleted meanwhile, no access) the generated cover is shown instead.
+ * (deleted meanwhile, no access) the generated cover is shown instead. `imageSrc` gives the address of a picture
+ * served elsewhere (a material cover); it takes the place of the attachment address.
  */
-export function Cover({ color, title, className = '', variant = 'banner', imageId }: { color: string; title: string; className?: string; variant?: 'banner' | 'tile'; imageId?: string | null }) {
+export function Cover({ color, title, className = '', variant = 'banner', imageId, imageSrc }: { color: string; title: string; className?: string; variant?: 'banner' | 'tile'; imageId?: string | null; imageSrc?: string }) {
   const [failed, setFailed] = useState<string | null>(null);
   if (imageId && failed !== imageId) {
     return (
       <div className={`relative overflow-hidden bg-surface-alt ${className}`} aria-hidden data-cover-image={imageId}>
         {/* eslint-disable-next-line @next/next/no-img-element -- private attachment served by the API with the session cookie */}
-        <img src={attachmentUrl(imageId, true)} alt="" className="h-full w-full object-cover" onError={() => setFailed(imageId)} />
+        <img src={imageSrc ?? attachmentUrl(imageId, true)} alt="" className="h-full w-full object-cover" onError={() => setFailed(imageId)} />
       </div>
     );
   }

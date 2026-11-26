@@ -16,6 +16,8 @@ import { newGapsDraft, validateGapsDraft } from './gapsDraft';
 import { GapsEditorFields } from './GapsEditorFields';
 import { newTextDraft, validateTextDraft } from './textDraft';
 import { TextEditorFields } from './TextEditorFields';
+import { newPdfDraft, validatePdfDraft } from './pdfDraft';
+import { PdfEditorFields } from './PdfEditorFields';
 
 type Tab = 'exercise' | 'settings' | 'stats';
 
@@ -28,7 +30,7 @@ export interface EditorTarget {
   kind?: ExerciseKind;
 }
 
-const KINDS: ExerciseKind[] = ['test', 'gaps', 'text'];
+const KINDS: ExerciseKind[] = ['test', 'gaps', 'text', 'pdf'];
 export const isExerciseKind = (k: string): k is ExerciseKind => (KINDS as string[]).includes(k);
 
 export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget | null; onClose: () => void }) {
@@ -40,17 +42,23 @@ export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget 
   const [initial, setInitial] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmClose, setConfirmClose] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const kind: ExerciseKind = (target?.exercise?.kind as ExerciseKind | undefined) ?? target?.kind ?? 'test';
   const gaps = kind === 'gaps';
   const text = kind === 'text';
+  const pdf = kind === 'pdf';
+  /** Read-only blocks (text, PDF): no answer, so no check mode, timer, points or statistics. */
+  const readOnly = text || pdf;
 
   useEffect(() => {
     if (!target) return;
-    const d = target.exercise ? draftFromExercise(target.exercise) : target.kind === 'gaps' ? newGapsDraft() : target.kind === 'text' ? newTextDraft() : newDraft();
+    const d = target.exercise ? draftFromExercise(target.exercise) : target.kind === 'gaps' ? newGapsDraft() : target.kind === 'text' ? newTextDraft() : target.kind === 'pdf' ? newPdfDraft() : newDraft();
     setDraft(d);
     setInitial(JSON.stringify(d));
     setErrors({});
     setTab('exercise');
+    setUploading(false);
   }, [target]);
 
   const dirty = useMemo(() => JSON.stringify(draft) !== initial, [draft, initial]);
@@ -76,8 +84,19 @@ export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget 
     },
   });
 
+  const remove = useMutation({
+    mutationFn: () => exercisesApi.remove(target!.exercise!.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['editor-exercises', target!.lessonId] });
+      qc.invalidateQueries({ queryKey: ['lesson-exercises'] });
+      setConfirmDelete(false);
+      onClose();
+    },
+    onError: (e) => { setConfirmDelete(false); toast(errorMessage(e, t), 'error'); },
+  });
+
   const submit = () => {
-    const errs = gaps ? validateGapsDraft(draft, t) : text ? validateTextDraft(draft, t) : validateDraft(draft, t);
+    const errs = gaps ? validateGapsDraft(draft, t) : text ? validateTextDraft(draft, t) : pdf ? validatePdfDraft(draft, t) : validateDraft(draft, t);
     setErrors(errs);
     if (Object.keys(errs).length) {
       setTab(Object.keys(errs).some((k) => k.startsWith('settings')) ? 'settings' : 'exercise');
@@ -107,13 +126,18 @@ export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget 
     <>
       <Modal open={!!target} onClose={requestClose} size="lg" bodyClassName="px-0 py-0"
         title={gaps ? (target?.exercise ? t('editor.titleEditGaps') : t('editor.titleNewGaps')) : text ? (target?.exercise ? t('editor.titleEditText') : t('editor.titleNewText'))
+          : pdf ? (target?.exercise ? t('editor.titleEditPdf') : t('editor.titleNewPdf'))
           : target?.exercise ? t('editor.titleEdit') : t('editor.titleNew')}
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-3">
-            <p className="max-w-[420px] text-xs text-ink-muted">{target?.exercise ? t('editor.versionNote') : ''}</p>
+            {pdf && target?.exercise ? (
+              <Button variant="ghost" className="text-danger-text" icon={<Trash2 size={16} />} onClick={() => setConfirmDelete(true)}>{t('pdf.deleteBlock')}</Button>
+            ) : (
+              <p className="max-w-[420px] text-xs text-ink-muted">{target?.exercise ? t('editor.versionNote') : ''}</p>
+            )}
             <div className="flex gap-2">
               <Button variant="secondary" onClick={requestClose}>{t('common.cancel')}</Button>
-              <Button onClick={submit} loading={save.isPending}>{t('common.save')}</Button>
+              <Button onClick={submit} loading={save.isPending} disabled={uploading}>{t('common.save')}</Button>
             </div>
           </div>
         }>
@@ -122,7 +146,7 @@ export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget 
             items={[
               { value: 'exercise', label: t('editor.tabExercise') },
               { value: 'settings', label: t('editor.tabSettings') },
-              ...(target?.exercise && !text ? [{ value: 'stats' as Tab, label: t('editor.tabStats') }] : []),
+              ...(target?.exercise && !readOnly ? [{ value: 'stats' as Tab, label: t('editor.tabStats') }] : []),
             ]} />
         </div>
 
@@ -149,7 +173,16 @@ export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget 
             </div>
           )}
 
-          {tab === 'exercise' && !gaps && !text && (
+          {tab === 'exercise' && pdf && target && (
+            <div className="flex flex-col gap-5">
+              <Field label={t('editor.title')} error={errors.title} required>
+                {(p) => <Input {...p} data-autofocus value={draft.title} maxLength={200} placeholder={t('editor.pdfTitlePlaceholder')} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} />}
+              </Field>
+              <PdfEditorFields lessonId={target.lessonId} exercise={target.exercise} draft={draft} setDraft={setDraft} errors={errors} onBusy={setUploading} />
+            </div>
+          )}
+
+          {tab === 'exercise' && !gaps && !text && !pdf && (
             <div className="flex flex-col gap-5">
               <Field label={t('editor.title')} error={errors.title} required>
                 {(p) => <Input {...p} data-autofocus value={draft.title} maxLength={200} placeholder={t('editor.titlePlaceholder')} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} />}
@@ -222,11 +255,11 @@ export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget 
             </div>
           )}
 
-          {tab === 'settings' && text && (
+          {tab === 'settings' && readOnly && (
             <Switch checked={draft.hidden} onChange={(v) => setDraft((d) => ({ ...d, hidden: v }))} label={t('editor.textHidden')} hint={t('editor.textHiddenHint')} />
           )}
 
-          {tab === 'settings' && !text && (
+          {tab === 'settings' && !readOnly && (
             <div className="flex flex-col gap-6">
               <Switch checked={draft.hidden} onChange={(v) => setDraft((d) => ({ ...d, hidden: v }))} label={t('editor.hidden')} hint={t('editor.hiddenHint')} />
 
@@ -281,6 +314,8 @@ export function ExerciseEditorModal({ target, onClose }: { target: EditorTarget 
       </Modal>
       <ConfirmDialog open={confirmClose} onClose={() => setConfirmClose(false)} title={t('editor.unsavedConfirm')} confirmLabel={t('common.close')} tone="danger"
         onConfirm={() => { setConfirmClose(false); onClose(); }} />
+      <ConfirmDialog open={confirmDelete} onClose={() => setConfirmDelete(false)} onConfirm={() => remove.mutate()} loading={remove.isPending}
+        tone="danger" title={t('editor.deleteConfirmTitle')} text={t('editor.deleteConfirm')} confirmLabel={t('common.delete')} />
     </>
   );
 }

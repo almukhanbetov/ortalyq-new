@@ -37,6 +37,7 @@ export function Tabs<T extends string>({ items, value, onChange, className, size
             ref={(el) => {
               refs.current[i] = el;
             }}
+            type="button" // inside a form a tab must not submit it
             role="tab"
             id={idPrefix ? `${idPrefix}-tab-${it.value}` : undefined}
             aria-selected={active}
@@ -63,7 +64,7 @@ export function Segmented<T extends string>({ items, value, onChange }: { items:
   return (
     <div role="tablist" className="inline-flex rounded-lg bg-surface-hover p-1">
       {items.map((it) => (
-        <button key={it.value} role="tab" aria-selected={it.value === value} onClick={() => onChange(it.value)}
+        <button key={it.value} type="button" role="tab" aria-selected={it.value === value} onClick={() => onChange(it.value)}
           className={cn('h-8 rounded-md px-3 text-sm font-medium transition-colors', it.value === value ? 'bg-surface text-ink shadow-card' : 'text-ink-muted hover:text-ink')}>
           {it.label}
         </button>

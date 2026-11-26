@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"ortalyq/backend/internal/languages"
 )
 
 const (
@@ -15,17 +17,10 @@ const (
 	ModeOpen = "open"
 )
 
-// Languages a marathon can teach (ISO 639-1). Display names live in the frontend locales.
-var Languages = []string{"ar", "cs", "de", "en", "es", "fr", "it", "ja", "kk", "ko", "pl", "pt", "ru", "tr", "uz", "zh"}
+// Languages a marathon can teach: the project list (also used by materials). Display names live in the frontend locales.
+var Languages = languages.Codes
 
-func knownLanguage(code string) bool {
-	for _, l := range Languages {
-		if l == code {
-			return true
-		}
-	}
-	return false
-}
+func knownLanguage(code string) bool { return languages.Known(code) }
 
 // Student statuses in a marathon. "inactive" is computed, never stored: after end_at every student is inactive.
 const (

@@ -6,11 +6,16 @@ type CourseRequest struct {
 	Title       *string `json:"title"`
 	Description *string `json:"description"`
 	CoverColor  *string `json:"cover_color"`
+	// CoverImageID: an uploaded cover of the teacher; "" removes the picture (the colour is shown).
+	CoverImageID    *string   `json:"cover_image_id"`
+	Language        *string   `json:"language"`
+	SectionsEnabled *bool     `json:"sections_enabled"`
+	Tags            *[]string `json:"tags"`
 }
 
 type LessonRequest struct {
-	Title       *string `json:"title"`
-	Description *string `json:"description"`
+	Title       *string      `json:"title"`
+	Description *string      `json:"description"`
 	Attrs       *LessonAttrs `json:"attrs"`
 }
 

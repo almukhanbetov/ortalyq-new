@@ -1,13 +1,18 @@
 package materials
 
 import (
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
+	"ortalyq/backend/internal/apperr"
 	"ortalyq/backend/internal/httpx"
 	"ortalyq/backend/internal/modules/auth"
+	"ortalyq/backend/internal/modules/uploads"
 )
 
 type Handler struct{ svc *Service }
@@ -209,4 +214,55 @@ func (h *Handler) Options(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, o)
+}
+
+// UploadCover takes a cover picture of the material form (multipart field "file").
+func (h *Handler) UploadCover(c *gin.Context) {
+	// The body is cut a little above the limit; the file store checks the exact size and the content.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, uploads.ImageMaxBytes+1<<20)
+	fh, err := c.FormFile("file")
+	if err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) || strings.Contains(err.Error(), "too large") {
+			httpx.Fail(c, uploads.ErrImageTooLarge())
+			return
+		}
+		httpx.Fail(c, apperr.Validation(map[string]string{"file": "Выберите картинку"}))
+		return
+	}
+	f, err := fh.Open()
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	defer f.Close()
+	cover, err := h.svc.UploadCover(c.Request.Context(), principal(c), fh.Size, f)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, cover)
+}
+
+// Cover serves a cover picture to its uploader.
+func (h *Handler) Cover(c *gin.Context) {
+	id, ok := httpx.UUIDParam(c, "id")
+	if !ok {
+		return
+	}
+	cover, f, err := h.svc.OpenCover(c.Request.Context(), principal(c), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	defer f.Close()
+	w := c.Writer.Header()
+	w.Set("Content-Type", cover.MimeType)
+	w.Set("Content-Length", strconv.FormatInt(cover.SizeBytes, 10))
+	w.Set("Content-Disposition", `inline; filename="cover"`)
+	w.Set("X-Content-Type-Options", "nosniff")
+	w.Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	w.Set("Cache-Control", "private, max-age=86400, immutable") // a cover id never changes its picture
+	c.Status(http.StatusOK)
+	_, _ = io.Copy(c.Writer, f)
 }

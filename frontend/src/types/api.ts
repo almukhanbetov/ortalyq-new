@@ -283,6 +283,8 @@ export interface Lesson extends LessonAttrs {
   description: string;
   position: number;
   section_count: number;
+  /** The «Разделы» switch of the course. */
+  sections_enabled: boolean;
   sections?: Section[];
   updated_at: string;
 }
@@ -293,6 +295,13 @@ export interface Course {
   title: string;
   description: string;
   cover_color: string;
+  /** Uploaded cover picture (materialsApi.coverUrl); null shows the colour. */
+  cover_image_id: string | null;
+  /** A code of the project language list or ''. */
+  language: string;
+  /** «Разделы»: lessons are divided into named sections; off — one section shown as a list. */
+  sections_enabled: boolean;
+  tags: string[];
   position: number;
   lesson_count: number;
   lessons?: Lesson[];
@@ -353,7 +362,33 @@ export interface Question {
 }
 
 /** Exercise kinds that work at this stage. */
-export type ExerciseKind = 'test' | 'gaps' | 'text';
+export type ExerciseKind = 'test' | 'gaps' | 'text' | 'pdf';
+
+/** The PDF of a «PDF-документ» block. It is opened only through its exercise (see exercisesApi.fileUrl / attemptsApi.fileUrl). */
+/** A PDF document in «Личные материалы»: a personal material of the teacher who uploaded it. */
+export interface MaterialDocument {
+  id: string;
+  title: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: string;
+}
+
+/** A cover picture uploaded from the material form. */
+export interface CourseCover {
+  id: string;
+  mime_type: string;
+  size_bytes: number;
+  width: number;
+  height: number;
+}
+
+export interface LessonFile {
+  id: string;
+  name: string;
+  size_bytes: number;
+}
 
 export interface ExerciseVersion {
   id: string;
@@ -363,6 +398,8 @@ export interface ExerciseVersion {
   title: string;
   settings: ExerciseSettings;
   questions: Question[];
+  /** «PDF-документ» only. */
+  file: LessonFile | null;
   created_at: string;
 }
 
@@ -400,6 +437,8 @@ export interface SaveExerciseRequest {
   settings: ExerciseSettings;
   questions: { prompt: string; multiple: boolean; options: { label: string; is_correct: boolean }[] }[];
   hidden?: boolean;
+  /** «PDF-документ»: the uploaded file (POST /lessons/:id/files). */
+  file_id?: string | null;
 }
 
 export interface ExerciseStats {

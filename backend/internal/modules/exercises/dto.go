@@ -18,6 +18,8 @@ type SaveRequest struct {
 	Settings  Settings        `json:"settings"`
 	Questions []QuestionInput `json:"questions"`
 	Hidden    *bool           `json:"hidden"`
+	// FileID is the PDF of a «PDF-документ» block, uploaded before with POST /lessons/:id/files.
+	FileID *uuid.UUID `json:"file_id"`
 }
 
 type CreateRequest struct {

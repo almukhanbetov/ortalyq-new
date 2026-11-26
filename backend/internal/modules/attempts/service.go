@@ -2,6 +2,7 @@ package attempts
 
 import (
 	"context"
+	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -22,6 +23,7 @@ type Exercises interface {
 	ListForLesson(ctx context.Context, lessonID uuid.UUID, scope string, includeHidden bool) ([]exercises.Exercise, error)
 	Exercise(ctx context.Context, id uuid.UUID) (*exercises.Exercise, error)
 	Versions(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*exercises.Version, error)
+	OpenVersionFile(ctx context.Context, versionID uuid.UUID) (*exercises.File, *os.File, error)
 }
 
 type Classrooms interface {
@@ -343,6 +345,20 @@ func (s *Service) accessibleExercise(ctx context.Context, p auth.Principal, clas
 		return nil, "", apperr.NotFound("Упражнение")
 	}
 	return e, role, nil
+}
+
+// ClassFile opens the PDF of a «PDF-документ» block for a member of the class: the same check as the block itself
+// (the lesson is open in this class, the marathon admits the student, a hidden block reaches only the teacher).
+// The current version's file is served, the one the lesson shows. Anyone else gets 404, also on a direct link.
+func (s *Service) ClassFile(ctx context.Context, p auth.Principal, classroomID, exerciseID uuid.UUID) (*exercises.File, *os.File, error) {
+	e, _, err := s.accessibleExercise(ctx, p, classroomID, exerciseID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if e.Kind != exercises.KindPDF {
+		return nil, nil, apperr.NotFound("Файл")
+	}
+	return s.ex.OpenVersionFile(ctx, e.VersionID)
 }
 
 func (s *Service) single(ctx context.Context, role string, classroomID, studentID uuid.UUID, e *exercises.Exercise) (*ExerciseView, error) {
