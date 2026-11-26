@@ -674,3 +674,48 @@ export interface StudentInviteSent { email: string; expires_at: string; resend_a
 /** The invitation link page: who invites, the address, and whether to sign in or create an account. */
 export interface StudentInviteLink { teacher_name: string; email: string; expires_at: string; has_account: boolean }
 export interface StudentInviteAccepted { teacher_name: string }
+
+/**
+ * «Интерактивные доски»: an element of the drawing (board coordinates; the initial view is 1600 × 1000 at 100%).
+ * `id` is the editor's stable id; boards saved before ids existed get them on load.
+ */
+export type BoardItem =
+  | { id?: string; type: 'stroke'; color: string; width: number; points: [number, number][] }
+  | { id?: string; type: 'arrow'; color: string; width: number; points: [number, number][] }
+  | { id?: string; type: 'text'; color: string; x: number; y: number; size: number; text: string }
+  | { id?: string; type: 'sticky'; color: string; x: number; y: number; w: number; h: number; text: string }
+  | { id?: string; type: 'rect' | 'ellipse'; color: string; width: number; x: number; y: number; w: number; h: number }
+  | { id?: string; type: 'image'; image_id: string; x: number; y: number; w: number; h: number };
+
+export interface BoardImage {
+  id: string;
+  width: number;
+  height: number;
+  mime_type: string;
+}
+
+export interface BoardSummary {
+  id: string;
+  title: string;
+  updated_at: string;
+  created_at: string;
+}
+
+export interface Board extends BoardSummary {
+  version: number;
+  content: { items: BoardItem[] };
+  /** The owner's classes where the board is open in the lesson (owner's view only). */
+  open_in?: { classroom_id: string; name: string }[];
+}
+
+/** The board open in a class lesson, as the class members read it; null when none is open. */
+export interface ClassBoardView {
+  board: Board | null;
+  opened_at?: string;
+  /** The caller may draw: the owner always, a student with the teacher's permission. */
+  can_draw?: boolean;
+  /** Students allowed to draw now (teacher of the class only). */
+  drawers?: string[] | null;
+  /** The board made by «Создать копию для занятия» (only in the answer to that request). */
+  copy?: BoardSummary;
+}

@@ -1,6 +1,11 @@
 // Typed endpoint functions grouped by domain.
-import { api, request } from './client';
+import { API_URL, api, request } from './client';
 import type {
+  Board,
+  BoardImage,
+  BoardItem,
+  BoardSummary,
+  ClassBoardView,
   StudentInviteAccepted, StudentInviteLink, StudentInviteSent,
   Appearance, AppearanceRequest, EffectiveAppearance, ImageSlot, MarathonAppearance,
   Assignment, Attachment, CatalogEntry, Category, ChatMessage, Classroom, Course, Exercise, ExerciseStats, ExerciseView,
@@ -108,6 +113,38 @@ export const marathonsApi = {
   addStudents: (id: string, ids: string[]) => api.post<{ items: MarathonStudent[] }>(`/marathons/${id}/students`, { student_ids: ids }),
   setStudentsActive: (id: string, ids: string[], active: boolean) => api.put<{ items: MarathonStudent[] }>(`/marathons/${id}/students/active`, { student_ids: ids, active }),
   removeStudent: (id: string, sid: string) => api.del<{ items: MarathonStudent[] }>(`/marathons/${id}/students/${sid}`),
+};
+
+/** «Материалы» → «Интерактивные доски». */
+export const boardsApi = {
+  list: (q: string) => api.get<ListResponse<BoardSummary>>('/boards', { q, limit: 100 }),
+  create: (title: string) => api.post<Board>('/boards', { title }),
+  get: (id: string) => api.get<Board>(`/boards/${id}`),
+  save: (id: string, body: { content: { items: BoardItem[] }; version: number; force?: boolean; title?: string }) => api.put<Board>(`/boards/${id}`, body),
+  uploadImage: (id: string, file: File) => {
+    const f = new FormData();
+    f.append('file', file);
+    return api.upload<BoardImage>(`/boards/${id}/images`, f);
+  },
+  /** A picture of the board; served only to the board's owner (the browser sends the session cookie). */
+  imageUrl: (id: string, imageId: string) => `${API_URL}/api/boards/${id}/images/${imageId}`,
+};
+
+/** The board open in a class lesson: members read it, the teacher of the class opens and closes it. */
+export const classBoardApi = {
+  get: (cid: string) => api.get<ClassBoardView>(`/classrooms/${cid}/board`),
+  open: (cid: string, boardId: string) => api.put<ClassBoardView>(`/classrooms/${cid}/board`, { board_id: boardId }),
+  /** «Создать копию для занятия»: a copy of the board is made and opened; the same requestId twice makes one copy. */
+  openCopy: (cid: string, boardId: string, requestId: string) =>
+    api.put<ClassBoardView>(`/classrooms/${cid}/board`, { board_id: boardId, copy: true, request_id: requestId }),
+  close: (cid: string) => request<void>('DELETE', `/classrooms/${cid}/board`),
+  allowDrawing: (cid: string, userId: string) => api.put<ClassBoardView>(`/classrooms/${cid}/board/drawers/${userId}`),
+  revokeDrawing: (cid: string, userId: string) => request<ClassBoardView>('DELETE', `/classrooms/${cid}/board/drawers/${userId}`),
+  /** A student's pen stroke, added as its own action; the same client_id sent again is stored once. */
+  stroke: (cid: string, body: { board_id: string; client_id: string; color: string; width: number; points: [number, number][] }) =>
+    api.post<{ item_id: string; version: number; duplicate: boolean }>(`/classrooms/${cid}/board/strokes`, body),
+  /** A picture of the open board, served to members of the class only. */
+  imageUrl: (cid: string, imageId: string) => `${API_URL}/api/classrooms/${cid}/board/images/${imageId}`,
 };
 
 export const materialsApi = {

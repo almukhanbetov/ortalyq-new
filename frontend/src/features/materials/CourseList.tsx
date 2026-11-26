@@ -12,6 +12,7 @@ import { useT } from '@/lib/i18n';
 import { fieldErrors } from '@/lib/errors';
 import { Cover } from '@/features/classrooms/Cover';
 import { TitleModal } from './TitleModal';
+import { MaterialsTabs } from './MaterialsTabs';
 
 export function CourseList() {
   const t = useT();
@@ -29,6 +30,7 @@ export function CourseList() {
 
   return (
     <PageCard title={t('materials.title')} actions={<Button icon={<Plus size={18} />} onClick={() => setCreating(true)}>{t('materials.createCourse')}</Button>}>
+      <MaterialsTabs current="personal" />
       <QueryState query={q}>
         {(data) =>
           data.items.length === 0 ? <EmptyState title={t('materials.noCourses')} /> : (

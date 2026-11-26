@@ -83,3 +83,22 @@ export function marathonFromParam(v: string | null): string | null {
 export function classUrl(c: { id: string; lesson_type: string }) {
   return c.lesson_type === 'marathon' ? marathonUrl(c.id) : `/classes/${c.id}`;
 }
+
+/** «Материалы» → «Личные материалы»: the teacher's own materials (courses). The search is kept in the address (?q=…). */
+export const MATERIALS_ROUTE = '/materials';
+
+export function materialsUrl(params: { q?: string } = {}) {
+  return params.q ? `${MATERIALS_ROUTE}?q=${encodeURIComponent(params.q)}` : MATERIALS_ROUTE;
+}
+
+/** «Материалы» → «Интерактивные доски»: the teacher's personal boards. The search is kept in the address. */
+export const MATERIALS_BOARDS_ROUTE = '/materials/boards';
+
+export function boardsUrl(params: { q?: string } = {}) {
+  return params.q ? `${MATERIALS_BOARDS_ROUTE}?q=${encodeURIComponent(params.q)}` : MATERIALS_BOARDS_ROUTE;
+}
+
+/** The board editor. */
+export function boardUrl(id: string) {
+  return `${MATERIALS_BOARDS_ROUTE}/${id}`;
+}
