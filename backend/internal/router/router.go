@@ -66,6 +66,7 @@ func New(cfg config.Config, pool *pgxpool.Pool) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	matSvc.SetFiles(upSvc)
 	exSvc := exercises.NewService(exercises.NewRepository(pool), matSvc, classSvc, upSvc)
 	hwRepo := homework.NewRepository(pool)
 	marRepo := marathons.NewRepository(pool)

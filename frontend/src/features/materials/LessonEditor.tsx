@@ -143,6 +143,20 @@ function SectionsEditor({ lesson, onAdd, onEdit }: { lesson: Lesson; onAdd: (sec
   const reorder = useMutation({ mutationFn: (ids: string[]) => materialsApi.reorderSections(lesson.id, ids), onSettled: refresh });
   const move = (i: number, d: -1 | 1) => { const ids = sections.map((s) => s.id); [ids[i], ids[i + d]] = [ids[i + d], ids[i]]; reorder.mutate(ids); };
 
+  // «Разделы» off in the course: the lesson's one section is shown as a plain list of exercises (no section title,
+  // order or «Добавить раздел»). A lesson with several sections, or none, keeps the section editor.
+  if (!lesson.sections_enabled && sections.length === 1) {
+    const s = sections[0];
+    return (
+      <div data-testid="lesson-flat">
+        <ExerciseRows items={(exercises.data?.items ?? []).filter((e) => e.section_id === s.id)} lessonId={lesson.id} scope="lesson" sectionId={s.id}
+          onEdit={onEdit} emptyText={t('materials.lessonEmpty')} />
+        <Button variant="soft" size="sm" className="mt-3" icon={<Plus size={16} />} onClick={() => onAdd(s.id)}>{t('materials.addExercise')}</Button>
+        <p className="mt-4 text-xs text-ink-muted">{t('materials.sectionsOffHint')}</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       {sections.length === 0 && <EmptyState title={t('materials.noSections')} />}

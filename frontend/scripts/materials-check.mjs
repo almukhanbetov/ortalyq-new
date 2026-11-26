@@ -41,7 +41,8 @@ try {
   const T = await login(users.teacher.email, users.teacher.password);
   const p = T.p;
   const main = p.locator('main');
-  const cards = main.locator('ul.grid > li');
+  // Material cards; the first card of the grid is «Создать материал».
+  const cards = main.locator('ul.grid > li:not(:has([data-testid="create-material-card"]))');
   const count = async () => Number((await main.getByText(/Кол-во материалов \d+/).innerText()).match(/\d+/)[0]);
   const cardTitles = async () => (await cards.locator('h2').allInnerTexts()).map((s) => s.trim());
 
@@ -56,13 +57,13 @@ try {
 
   // ---- 2. Create a material: it opens, keeps data after a reload ----
   const title = `Present Simple: практикум ${RUN}`;
-  await main.getByRole('button', { name: 'Создать материал' }).click();
+  assert(await main.locator('ul.grid > li').first().getByTestId('create-material-card').count() === 1, '«Создать материал» is the first card');
+  await main.getByTestId('create-material-card').click();
   const dlg = p.getByRole('dialog', { name: 'Создать материал' });
-  await dlg.getByLabel('Название материала').fill(title);
+  await dlg.getByLabel('Название').fill(title);
   await dlg.getByLabel('Описание').fill('Тестовый материал: утвердительные и отрицательные предложения.');
-  await dlg.getByRole('button', { name: '#9254DE' }).click();
   await p.screenshot({ path: `${OUT}/02-create-dialog.png` });
-  await dlg.getByRole('button', { name: 'Сохранить' }).click();
+  await dlg.getByRole('button', { name: 'Создать', exact: true }).click();
   await p.waitForURL(/\/materials\/courses\/[0-9a-f-]{36}$/);
   const materialPath = new URL(p.url()).pathname;
   await main.getByRole('heading', { name: title }).waitFor();
@@ -113,10 +114,12 @@ try {
   await p.waitForURL(new RegExp(materialPath + '$'));
   const edited = `Present Simple — разговорный практикум ${RUN}`;
   await main.getByRole('button', { name: 'Редактировать' }).click();
-  const ed = p.getByRole('dialog', { name: 'Редактировать' });
-  assert((await ed.getByLabel('Название материала').inputValue()) === title, 'edit dialog prefilled');
-  await ed.getByLabel('Название материала').fill(edited);
-  await ed.getByRole('button', { name: '#16C784' }).click();
+  const ed = p.getByRole('dialog', { name: 'Редактировать материал' });
+  // The form is filled by an effect right after the dialog opens: wait for it instead of reading the first frame.
+  await ed.getByLabel('Название').evaluate((el, v) => new Promise((ok, fail) => {
+    const t0 = Date.now(); const tick = () => (el.value === v ? ok() : Date.now() - t0 > 5000 ? fail(new Error('edit dialog prefilled')) : requestAnimationFrame(tick)); tick();
+  }), title);
+  await ed.getByLabel('Название').fill(edited);
   await ed.getByRole('button', { name: 'Сохранить' }).click();
   await ed.waitFor({ state: 'detached' });
   await p.reload();

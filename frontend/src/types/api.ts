@@ -283,6 +283,8 @@ export interface Lesson extends LessonAttrs {
   description: string;
   position: number;
   section_count: number;
+  /** The «Разделы» switch of the course. */
+  sections_enabled: boolean;
   sections?: Section[];
   updated_at: string;
 }
@@ -293,6 +295,13 @@ export interface Course {
   title: string;
   description: string;
   cover_color: string;
+  /** Uploaded cover picture (materialsApi.coverUrl); null shows the colour. */
+  cover_image_id: string | null;
+  /** A code of the project language list or ''. */
+  language: string;
+  /** «Разделы»: lessons are divided into named sections; off — one section shown as a list. */
+  sections_enabled: boolean;
+  tags: string[];
   position: number;
   lesson_count: number;
   lessons?: Lesson[];
@@ -364,6 +373,15 @@ export interface MaterialDocument {
   mime_type: string;
   size_bytes: number;
   created_at: string;
+}
+
+/** A cover picture uploaded from the material form. */
+export interface CourseCover {
+  id: string;
+  mime_type: string;
+  size_bytes: number;
+  width: number;
+  height: number;
 }
 
 export interface LessonFile {

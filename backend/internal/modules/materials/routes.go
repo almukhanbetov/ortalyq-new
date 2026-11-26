@@ -14,6 +14,8 @@ func (h *Handler) Register(authed *gin.RouterGroup) {
 	t.PUT("/courses/order", h.ReorderCourses)
 	t.GET("/courses/:id", h.GetCourse)
 	t.PATCH("/courses/:id", h.UpdateCourse)
+	t.POST("/course-covers", h.UploadCover)
+	t.GET("/course-covers/:id", h.Cover)
 	t.POST("/courses/:id/lessons", h.CreateLesson)
 	t.PUT("/courses/:id/lessons/order", h.ReorderLessons)
 	t.GET("/material-filters", h.Options)

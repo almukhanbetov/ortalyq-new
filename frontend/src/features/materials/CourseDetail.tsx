@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowLeft, ArrowUp, FileSearch, Pencil, Plus } from 'lucide-react';
-import { Button, EmptyState, ErrorState, IconButton, Loading, buttonClass } from '@/components/ui';
+import { Badge, Button, EmptyState, ErrorState, IconButton, Loading, buttonClass } from '@/components/ui';
 import { PageCard } from '@/components/layout/PageCard';
 import { ApiError } from '@/lib/api/client';
 import { materialsApi } from '@/lib/api/endpoints';
@@ -13,7 +13,7 @@ import { useT } from '@/lib/i18n';
 import { fieldErrors } from '@/lib/errors';
 import { lessonEditorUrl, materialsUrl } from '@/lib/routes';
 import { Cover } from '@/features/classrooms/Cover';
-import { MaterialModal, type MaterialFields } from './MaterialModal';
+import { MaterialModal } from './MaterialModal';
 import { TitleModal } from './TitleModal';
 
 /** One personal material: its cover, description and lessons. The server answers 404 for anyone but the owner. */
@@ -25,7 +25,6 @@ export function CourseDetail({ id }: { id: string }) {
   const q = useQuery({ queryKey: qk.course(id), queryFn: () => materialsApi.course(id) });
   const invalidate = () => { qc.invalidateQueries({ queryKey: ['course', id] }); qc.invalidateQueries({ queryKey: ['courses'] }); };
   const create = useMutation({ mutationFn: (title: string) => materialsApi.createLesson(id, title), onSuccess: () => { invalidate(); setCreating(false); } });
-  const update = useMutation({ mutationFn: (b: MaterialFields) => materialsApi.updateCourse(id, b), onSuccess: () => { invalidate(); setEditing(false); } });
   const reorder = useMutation({ mutationFn: (ids: string[]) => materialsApi.reorderLessons(id, ids), onSettled: invalidate });
 
   const back = (
@@ -52,12 +51,22 @@ export function CourseDetail({ id }: { id: string }) {
     <PageCard maxWidth={1024}>
       {back}
       <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-start">
-        <Cover color={course.cover_color} title={course.title} className="aspect-[16/9] w-full shrink-0 rounded-xl sm:w-60" />
+        <Cover color={course.cover_color} title={course.title} className="aspect-[16/9] w-full shrink-0 rounded-xl sm:w-60"
+          imageId={course.cover_image_id} imageSrc={course.cover_image_id ? materialsApi.coverUrl(course.cover_image_id) : undefined} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-ink-faint">{t('materials.personal')}</p>
           <h1 className="mt-1 break-words text-2xl font-bold text-ink">{course.title}</h1>
           {course.description && <p className="mt-2 max-w-2xl whitespace-pre-line text-base text-ink-body">{course.description}</p>}
-          <p className="mt-2 text-sm text-ink-muted">{t('picker.lessonsCount', { n: course.lesson_count })}</p>
+          <p className="mt-2 text-sm text-ink-muted">
+            {t('picker.lessonsCount', { n: course.lesson_count })}
+            {course.language && <> · <span data-testid="course-language">{t(`languages.${course.language}`)}</span></>}
+            {' · '}{course.sections_enabled ? t('materialForm.sectionsOnShort') : t('materialForm.sectionsOffShort')}
+          </p>
+          {course.tags.length > 0 && (
+            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={t('materialForm.tags')} data-testid="course-tags">
+              {course.tags.map((x) => <li key={x}><Badge tone="primary">{x}</Badge></li>)}
+            </ul>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
             <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => setEditing(true)}>{t('materials.editMaterial')}</Button>
             <Button icon={<Plus size={18} />} onClick={() => setCreating(true)}>{t('materials.createLesson')}</Button>
@@ -83,9 +92,7 @@ export function CourseDetail({ id }: { id: string }) {
       )}
       <TitleModal open={creating} onClose={() => setCreating(false)} title={t('materials.createLesson')} label={t('materials.lessonTitle')}
         loading={create.isPending} error={fieldErrors(create.error).title} onSubmit={(title) => create.mutate(title)} />
-      <MaterialModal open={editing} onClose={() => setEditing(false)} heading={t('materials.editMaterial')}
-        initial={{ title: course.title, description: course.description, cover_color: course.cover_color }}
-        loading={update.isPending} error={update.error} onSubmit={(v) => update.mutate(v)} />
+      <MaterialModal open={editing} onClose={() => setEditing(false)} course={course} onSaved={() => { invalidate(); setEditing(false); }} />
     </PageCard>
   );
 }

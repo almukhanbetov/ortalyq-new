@@ -9,7 +9,7 @@ import type {
   CatalogCourse,
   StudentInviteAccepted, StudentInviteLink, StudentInviteSent,
   Appearance, AppearanceRequest, EffectiveAppearance, ImageSlot, MarathonAppearance,
-  Assignment, Attachment, CatalogEntry, Category, ChatMessage, Classroom, Course, Exercise, ExerciseStats, ExerciseView, LessonFile, MaterialDocument,
+  Assignment, Attachment, CatalogEntry, Category, ChatMessage, Classroom, Course, Exercise, ExerciseStats, ExerciseView, LessonFile, MaterialDocument, CourseCover,
   FilterOptions, Gif, Grade, InvitationInfo, InviteResult, MarathonInvitation, HomeworkStatus, HomeworkView, Lesson, LessonAttrs, LessonFilter, ListResponse, MarathonLessonCopied, MarathonLessonFields, MarathonLessonReview, MarathonLessons, MarathonMe, MarathonMode, MarathonPassage, MarathonLessonComment, MarathonLessonResults, MarathonMyResults, MarathonReviewRequest, MarathonStudentsRating, MarathonSaveRequest, MarathonStats, MarathonStatsSettings, MarathonUnlockAfter, MarathonStudent, MarathonStudentProgress, Me, Progress,
   SaveExerciseRequest, Scope, Section, SignupLink, SignupRequested, User,
 } from '@/types/api';
@@ -163,11 +163,30 @@ export const documentsApi = {
   fileUrl: (id: string) => `${API_URL}/api/documents/${id}/file`,
 };
 
+/** Fields of «Создать материал» / editing a material. cover_image_id '' removes the picture. */
+export interface CourseFields {
+  title?: string;
+  description?: string;
+  cover_color?: string;
+  cover_image_id?: string;
+  language?: string;
+  sections_enabled?: boolean;
+  tags?: string[];
+}
+
 export const materialsApi = {
   courses: (f: LessonFilter & { limit?: number; offset?: number }) => api.get<ListResponse<Course>>('/courses', { ...f }),
   course: (id: string, f: LessonFilter = {}) => api.get<Course>(`/courses/${id}`, { ...f }),
-  createCourse: (body: { title: string; description?: string; cover_color?: string }) => api.post<Course>('/courses', body),
-  updateCourse: (id: string, body: { title?: string; description?: string; cover_color?: string }) => api.patch<Course>(`/courses/${id}`, body),
+  createCourse: (body: CourseFields & { title: string }) => api.post<Course>('/courses', body),
+  updateCourse: (id: string, body: CourseFields) => api.patch<Course>(`/courses/${id}`, body),
+  /** Uploads a cover picture for the material form; the material refers to it by cover_image_id when saved. */
+  uploadCover: (file: File) => {
+    const f = new FormData();
+    f.append('file', file);
+    return api.upload<CourseCover>('/course-covers', f);
+  },
+  /** The cover picture, for its owner (the browser sends the session cookie). */
+  coverUrl: (id: string) => `${API_URL}/api/course-covers/${id}`,
   reorderCourses: (ids: string[]) => api.put<void>('/courses/order', { ids }),
   createLesson: (courseId: string, title: string) => api.post<Lesson>(`/courses/${courseId}/lessons`, { title }),
   reorderLessons: (courseId: string, ids: string[]) => api.put<void>(`/courses/${courseId}/lessons/order`, { ids }),
